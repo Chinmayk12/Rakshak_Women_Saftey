@@ -16,7 +16,7 @@ class SplashScreen : AppCompatActivity() {
         setContentView(R.layout.activity_splash_screen)
         // Delay for 3 seconds before navigating to the HomePage activity
         Handler(Looper.getMainLooper()).postDelayed({
-            val intent = Intent(this@SplashScreen, register_user::class.java)
+            val intent = Intent(this@SplashScreen, Login::class.java)
             startActivity(intent)
             finish() // Close the splash screen activity
         }, 3000) // 3000 milliseconds (3 seconds)

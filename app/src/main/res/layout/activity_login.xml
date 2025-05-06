@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".login_activity"
+    tools:context=".Login"
     android:orientation="vertical"
     android:background="@color/app_background">
 
@@ -86,22 +86,22 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="20dp"
                         app:boxBackgroundMode="outline"
+                        android:hint="Email Address"
                         app:endIconMode="clear_text"
                         app:startIconTint="#878787"
                         app:endIconTint="#878787"
                         app:startIconDrawable="@drawable/ic_baseline_verified_user_24"
-                        app:hintEnabled="false">
+                        >
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@id/etEmail"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/login_input"
                             android:ems="10"
                             android:fontFamily="@font/f6"
-                            android:hint="Email Address"
                             android:inputType="textEmailAddress"
                             android:padding="20dp"
+                            android:textColor="@color/black"
                             android:textColorHint="#878787"
                             android:textCursorDrawable="@drawable/cursor_drawable" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -114,20 +114,19 @@
                         app:boxBackgroundMode="outline"
                         app:startIconDrawable="@drawable/ic_baseline_vpn_key_24"
                         app:endIconMode="password_toggle"
+                        android:hint="Password"
                         app:startIconTint="#878787"
-                        app:endIconTint="#878787"
-                        app:hintEnabled="false">
+                        app:endIconTint="#878787">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@id/etPassword"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/login_input"
                             android:ems="10"
                             android:fontFamily="@font/f6"
-                            android:hint="Password"
                             android:inputType="textPassword"
                             android:padding="20dp"
+                            android:textColor="@color/black"
                             android:textColorHint="#878787"
                             android:textCursorDrawable="@drawable/cursor_drawable" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -163,7 +162,9 @@
                     android:background="@drawable/login_btn"
                     android:fontFamily="@font/f6"
                     android:gravity="center"
-                    android:padding="18dp"
+                    android:padding="15dp"
+                    android:theme="@style/ThemeOverlay.Material3.Button"
+                    app:backgroundTint="#2196F3"
                     android:text="Login"
                     android:textAllCaps="false"
                     android:textColor="@color/white"

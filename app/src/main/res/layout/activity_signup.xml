@@ -7,18 +7,6 @@
     tools:context=".register_user"
     android:background="@color/backgroundColor">
 
-    <!-- Back Icon -->
-<!--    <ImageView-->
-<!--        android:id="@+id/signup_back_img"-->
-<!--        android:layout_width="wrap_content"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        app:srcCompat="@drawable/ic_baseline_arrow_back_24"-->
-<!--        android:elevation="20dp"-->
-<!--        android:layout_marginTop="40dp"-->
-<!--        android:layout_marginStart="15dp"-->
-<!--        android:background="@drawable/back_background" />-->
-
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -39,11 +27,11 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingBottom="100dp"
+                    android:paddingBottom="120dp"
                     android:layout_marginHorizontal="-10dp"
                     android:background="@drawable/login_bg"
                     android:orientation="vertical"
-                    android:paddingTop="60dp">
+                    android:paddingTop="80dp">
 
                     <TextView
                         android:id="@+id/textView"
@@ -74,32 +62,29 @@
                         android:layout_height="match_parent"
                         android:orientation="vertical"
                         android:paddingHorizontal="20dp"
-                        android:paddingBottom="100dp">
+                        android:paddingBottom="70dp">
 
                         <!-- Full Name -->
                         <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/name_input_layout"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_marginTop="20dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:hint="Full Name"
                             app:boxBackgroundMode="outline"
                             app:endIconMode="clear_text"
-                            app:endIconTint="#878787"
-                            app:hintEnabled="false"
-                            app:startIconDrawable="@drawable/ic_baseline_person_24"
-                            app:startIconTint="#878787">
+                            app:endIconTint="#878787">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etName"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/login_input"
-                                android:ems="10"
-                                android:fontFamily="@font/f6"
-                                android:hint="Full Name"
+                                android:drawableStart="@drawable/ic_baseline_person_24"
+                                android:drawablePadding="10dp"
                                 android:inputType="textPersonName"
+                                android:textColor="@color/black"
                                 android:padding="20dp"
-                                android:textColorHint="#878787"
-                                android:textCursorDrawable="@drawable/cursor_drawable" />
+                                android:textColorHint="#878787" />
                         </com.google.android.material.textfield.TextInputLayout>
 
                         <!-- Email -->
@@ -110,7 +95,7 @@
                             app:boxBackgroundMode="outline"
                             app:endIconMode="clear_text"
                             app:endIconTint="#878787"
-                            app:hintEnabled="false"
+                            android:hint="Email id"
                             app:startIconDrawable="@drawable/ic_baseline_verified_user_24"
                             app:startIconTint="#878787">
 
@@ -118,10 +103,9 @@
                                 android:id="@+id/etEmail"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/login_input"
                                 android:ems="10"
                                 android:fontFamily="@font/f6"
-                                android:hint="Email id"
+                                android:textColor="@color/black"
                                 android:inputType="textEmailAddress"
                                 android:padding="20dp"
                                 android:textColorHint="#878787"
@@ -136,7 +120,7 @@
                             app:boxBackgroundMode="outline"
                             app:endIconMode="clear_text"
                             app:endIconTint="#878787"
-                            app:hintEnabled="false"
+                            android:hint="Contact Number"
                             app:startIconDrawable="@drawable/ic_baseline_verified_user_24"
                             app:startIconTint="#878787">
 
@@ -144,11 +128,10 @@
                                 android:id="@+id/etContact"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/login_input"
                                 android:ems="10"
                                 android:fontFamily="@font/f6"
-                                android:hint="Contact Number"
                                 android:inputType="phone"
+                                android:textColor="@color/black"
                                 android:padding="20dp"
                                 android:textColorHint="#878787"
                                 android:textCursorDrawable="@drawable/cursor_drawable" />
@@ -163,7 +146,7 @@
                             app:boxBackgroundMode="outline"
                             app:endIconMode="password_toggle"
                             app:endIconTint="#878787"
-                            app:hintEnabled="false"
+                            android:hint="Password"
                             app:startIconDrawable="@drawable/ic_baseline_vpn_key_24"
                             app:startIconTint="#878787">
 
@@ -171,12 +154,11 @@
                                 android:id="@+id/etPassword"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/login_input"
                                 android:ems="10"
                                 android:fontFamily="@font/f6"
-                                android:hint="Password"
                                 android:inputType="textPassword"
                                 android:padding="20dp"
+                                android:textColor="@color/black"
                                 android:password="true"
                                 android:textColorHint="#878787"
                                 android:textCursorDrawable="@drawable/cursor_drawable"  />
@@ -190,7 +172,7 @@
                             app:boxBackgroundMode="outline"
                             app:endIconMode="password_toggle"
                             app:endIconTint="#878787"
-                            app:hintEnabled="false"
+                            android:hint="Renter password"
                             app:startIconDrawable="@drawable/ic_baseline_vpn_key_24"
                             app:startIconTint="#878787">
 
@@ -198,12 +180,11 @@
                                 android:id="@+id/etConfirmPassword"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/login_input"
                                 android:ems="10"
                                 android:fontFamily="@font/f6"
-                                android:hint="Renter password"
                                 android:inputType="textPassword"
                                 android:padding="20dp"
+                                android:textColor="@color/black"
                                 android:password="true"
                                 android:textColorHint="#878787"
                                 android:textCursorDrawable="@drawable/cursor_drawable"  />
@@ -227,6 +208,8 @@
                         android:background="@drawable/login_btn"
                         android:text="Register"
                         android:textColor="@color/white"
+                        android:theme="@style/ThemeOverlay.Material3.Button"
+                        app:backgroundTint="#2196F3"
                         android:textSize="20dp" />
                 </androidx.cardview.widget.CardView>
 

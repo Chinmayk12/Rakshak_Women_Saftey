@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Permissions -->
+    <uses-permission android:name="com.google.android.providers.gsf.permission.READ_GSERVICES" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -19,15 +21,13 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-
-    <!-- Add these two permissions for foreground service camera -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" /> <!-- Add these two permissions for foreground service camera -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CAMERA"
         tools:ignore="ForegroundServicePermission" />
-    <uses-permission android:name="android.permission.SYSTEM_CAMERA"
-        tools:ignore="ProtectedPermissions" />
-
-    <!-- Features -->
+    <uses-permission
+        android:name="android.permission.SYSTEM_CAMERA"
+        tools:ignore="ProtectedPermissions" /> <!-- Features -->
     <uses-feature android:name="android.hardware.camera" />
     <uses-feature android:name="android.hardware.camera.front" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
@@ -53,18 +53,19 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Women_safety"
-
         tools:targetApi="31">
-
-        <!-- SOS Detection Service with updated foregroundServiceType -->
+        <activity
+            android:name=".SafetyMapActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ForgotPassword"
+            android:exported="false" /> <!-- SOS Detection Service with updated foregroundServiceType -->
         <service
             android:name=".SOSDetectionService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="camera"
-            tools:ignore="ForegroundServicePermission" />
-
-        <!-- Activities -->
+            tools:ignore="ForegroundServicePermission" /> <!-- Activities -->
         <activity
             android:name=".ErisActivity"
             android:exported="false"
@@ -78,11 +79,17 @@
         <activity
             android:name=".VBlogActivity"
             android:exported="false" />
+
+        <meta-data
+            android:name="com.mappls.sdk.API_KEY"
+            android:value="772b6950d7ff705845ac5275c0b49e64" />
+
         <activity
             android:name=".SplashScreen"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
@@ -99,17 +106,18 @@
             android:name=".NearbyDoctors"
             android:exported="false" />
         <activity
-            android:name=".login_activity"
+            android:name=".Login"
             android:exported="false" />
         <activity
-            android:name=".register_user"
+            android:name=".Signup"
             android:exported="false" />
         <activity
             android:name=".profileActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivityy"
+            android:name=".MainActivity"
             android:exported="false" />
+
     </application>
 
 </manifest>

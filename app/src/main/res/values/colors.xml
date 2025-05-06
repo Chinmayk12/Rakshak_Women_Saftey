@@ -6,6 +6,7 @@
     <color name="backgroundColor">#F5F5F5</color> <!-- Light background -->
     <color name="primaryColor">#A17FD1</color> <!-- Purple for button -->
     <color name="primaryTextColor">#000000</color> <!-- Black text -->
+    <color name="button_blue">#2196F3</color>
     <!-- Primary Color -->
     <color name="colorPrimary">#cdbfd6</color> <!-- Purple -->
     <color name="colorPrimaryDark">#3700B3</color> <!-- Dark Purple -->
@@ -28,9 +29,11 @@
 
     <!-- Other Colors -->
     <color name="lightGray">#F5F5F5</color> <!-- Light gray for backgrounds -->
+    <color name="red_500">#F44336</color> <!-- Standard Material Red 500 -->
 
 
-<!--    my color-->
+
+    <!--    my color-->
     <color name="mobile_status">#0061C3</color>
     <color name="app_input">#EAEAEA</color>
     <color name="input_text_error">#fc5722</color>

@@ -1,25 +1,20 @@
 package com.kalpesh.women_safety
 
 import android.Manifest
-import android.R.attr
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
-import android.util.Log
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -28,10 +23,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import java.util.Locale
 
 
-class MainActivityy : AppCompatActivity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var btnManualSOS: ImageButton
     private lateinit var btnToggleVoiceSOS: Button
@@ -95,7 +89,7 @@ class MainActivityy : AppCompatActivity() {
             startActivity(intent)
         }
         btnnearbyhospital.setOnClickListener{
-            val intent = Intent(this, NearbyDoctors::class.java)
+            val intent = Intent(this, SafetyMapActivity::class.java)
             startActivity(intent)
         }
 
@@ -105,7 +99,7 @@ class MainActivityy : AppCompatActivity() {
         bottomNavigationView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
-                    val intent = Intent(this@MainActivityy, MainActivityy::class.java)
+                    val intent = Intent(this@MainActivity, MainActivity::class.java)
                     startActivity(intent)
 
                     true
@@ -198,7 +192,7 @@ class MainActivityy : AppCompatActivity() {
 
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                Toast.makeText(this@MainActivityy, "Listening for SOS commands...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Listening for SOS commands...", Toast.LENGTH_SHORT).show()
             }
 
             override fun onBeginningOfSpeech() {}
@@ -206,7 +200,7 @@ class MainActivityy : AppCompatActivity() {
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onError(error: Int) {
-                Toast.makeText(this@MainActivityy, "Error occurred: $error", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Error occurred: $error", Toast.LENGTH_SHORT).show()
             }
 
             override fun onResults(results: Bundle?) {
@@ -219,7 +213,7 @@ class MainActivityy : AppCompatActivity() {
                         }
                     }
                 }
-                Toast.makeText(this@MainActivityy, "No SOS word detected", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "No SOS word detected", Toast.LENGTH_SHORT).show()
             }
 
             override fun onPartialResults(partialResults: Bundle?) {}
@@ -306,14 +300,14 @@ class MainActivityy : AppCompatActivity() {
 
     // Function to Request SMS Permission
     private fun requestSmsPermission() {
-        ActivityCompat.requestPermissions(this@MainActivityy, arrayOf(Manifest.permission.SEND_SMS), 100)
+        ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.SEND_SMS), 100)
     }
 
     // Backup Function: Open Default SMS App
     private fun openSMSApp(phoneNumber: String, message: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("sms:$phoneNumber"))
         intent.putExtra("sms_body", message)
-        this@MainActivityy.startActivity(intent)
+        this@MainActivity.startActivity(intent)
     }
 
 
