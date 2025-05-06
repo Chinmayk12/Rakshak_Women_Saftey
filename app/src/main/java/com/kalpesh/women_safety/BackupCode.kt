@@ -1,13 +1,16 @@
 package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //import android.Manifest
 //import android.annotation.SuppressLint
+//import android.content.Intent
 //import android.content.pm.PackageManager
 //import android.location.Geocoder
+//import android.net.Uri
 //import android.os.Bundle
 //import android.util.Log
 //import android.view.Gravity
 //import android.widget.ImageButton
 //import android.widget.Toast
+//import androidx.appcompat.app.AlertDialog
 //import androidx.appcompat.app.AppCompatActivity
 //import androidx.core.app.ActivityCompat
 //import androidx.core.content.ContextCompat
@@ -19,16 +22,23 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //import com.mappls.sdk.geojson.FeatureCollection
 //import com.mappls.sdk.geojson.Point
 //import com.mappls.sdk.maps.annotations.IconFactory
+//import com.mappls.sdk.maps.annotations.Marker
 //import com.mappls.sdk.maps.annotations.MarkerOptions
 //import com.mappls.sdk.maps.MapView
 //import com.mappls.sdk.maps.Mappls
 //import com.mappls.sdk.maps.MapplsMap
+//import com.mappls.sdk.maps.OnMapReadyCallback as MapplsOnMapReadyCallback
 //import com.mappls.sdk.maps.camera.CameraUpdateFactory
 //import com.mappls.sdk.maps.geometry.LatLng
 //import com.mappls.sdk.maps.geometry.LatLngBounds
-//import com.mappls.sdk.maps.style.layers.CircleLayer
+//import com.mappls.sdk.maps.style.expressions.Expression.exponential
+//import com.mappls.sdk.maps.style.expressions.Expression.interpolate
+//import com.mappls.sdk.maps.style.expressions.Expression.stop
+//import com.mappls.sdk.maps.style.expressions.Expression.zoom
 //import com.mappls.sdk.maps.style.layers.PropertyFactory
+//import com.mappls.sdk.maps.style.layers.SymbolLayer
 //import com.mappls.sdk.maps.style.sources.GeoJsonSource
+//import com.mappls.sdk.maps.utils.BitmapUtils
 //import com.mappls.sdk.services.account.MapplsAccountManager
 //import com.mappls.sdk.services.api.OnResponseCallback
 //import com.mappls.sdk.services.api.nearby.MapplsNearby
@@ -38,20 +48,24 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //import java.io.IOException
 //import java.util.Locale
 //
-//class SafetyMapActivity : AppCompatActivity(), OnMapReadyCallback,
-//    com.mappls.sdk.maps.OnMapReadyCallback {
+//class SafetyMapActivity : AppCompatActivity(), OnMapReadyCallback, MapplsOnMapReadyCallback,
+//    MapplsMap.OnMarkerClickListener {
 //
 //    private lateinit var mapView: MapView
 //    private var mapplsMap: MapplsMap? = null
 //    private lateinit var fusedLocationClient: FusedLocationProviderClient
 //    private lateinit var btnMyLocation: ImageButton
 //    private var currentLocation: LatLng? = null
-//    private var currentLocationMarker: com.mappls.sdk.maps.annotations.Marker? = null
+//    private var currentLocationMarker: Marker? = null
+//
+//    // Store hospital markers with their data
+//    private val hospitalMarkers = HashMap<Marker, NearbyAtlasResult>()
 //
 //    companion object {
 //        private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
 //        private const val TAG = "SafetyMapActivity"
-//        private const val DEFAULT_ZOOM_LEVEL = 15.0 // Higher zoom level for better focus
+//        private const val DEFAULT_ZOOM_LEVEL = 15.0
+//        private const val MAX_HOSPITAL_DISTANCE_METERS = 5000 // 5km max distance for hospitals
 //    }
 //
 //    override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,6 +125,8 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //            isDoubleTapGesturesEnabled = true
 //        }
 //
+//        // Set marker click listener
+//        mapplsMap.setOnMarkerClickListener(this)
 //
 //        if (checkLocationPermission()) {
 //            // Initial map setup with current location
@@ -118,6 +134,25 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //        } else {
 //            requestLocationPermission()
 //        }
+//    }
+//
+//    override fun onMarkerClick(marker: Marker): Boolean {
+//        // Check if this is a hospital marker
+//        val hospital = hospitalMarkers[marker]
+//        if (hospital != null) {
+//            // Show dialog to navigate to this hospital
+//            hospital.latitude?.let { lat ->
+//                hospital.longitude?.let { lng ->
+//                    showNavigationConfirmDialog(
+//                        hospital.placeName ?: "Hospital",
+//                        lat.toDouble(),
+//                        lng.toDouble()
+//                    )
+//                }
+//            }
+//            return true // Consume the event
+//        }
+//        return false // Let default behavior handle other markers
 //    }
 //
 //    override fun onMapError(p0: Int, p1: String?) {
@@ -166,21 +201,70 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //
 //                    if (zoomToLocation) {
 //                        // Zoom to the current location with appropriate zoom level
+//                        // Use a higher zoom level for better focus on local area
 //                        mapplsMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(newLatLng, DEFAULT_ZOOM_LEVEL))
 //                    }
 //
+//                    // After ensuring camera is positioned properly, then find hospitals
 //                    findNearbyHospitals(it.latitude, it.longitude)
 //                } else {
 //                    showToast("Invalid location data")
+//
+//                    // Try requesting a fresh location instead of using last known
+//                    requestFreshLocation()
 //                }
 //            } ?: run {
-//                showToast("Location unavailable")
-//                Log.e(TAG, "Unable to get current location")
+//                showToast("Location unavailable, trying to get fresh location")
+//                Log.e(TAG, "Unable to get last known location")
+//
+//                // Try requesting a fresh location
+//                requestFreshLocation()
 //            }
 //        }.addOnFailureListener { e ->
 //            Log.e(TAG, "Error getting location: ${e.message}", e)
 //            showToast("Error getting location: ${e.localizedMessage}")
 //        }
+//    }
+//
+//    @SuppressLint("MissingPermission")
+//    private fun requestFreshLocation() {
+//        if (!checkLocationPermission()) {
+//            requestLocationPermission()
+//            return
+//        }
+//
+//        // Create location request for fresh location
+//        val locationRequest = com.google.android.gms.location.LocationRequest.create().apply {
+//            priority = com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY
+//            interval = 10000 // 10 seconds
+//            fastestInterval = 5000 // 5 seconds
+//        }
+//
+//        // Request a single update
+//        fusedLocationClient.requestLocationUpdates(
+//            locationRequest,
+//            object : com.google.android.gms.location.LocationCallback() {
+//                override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
+//                    locationResult.lastLocation?.let { location ->
+//                        val newLatLng = LatLng(location.latitude, location.longitude)
+//                        currentLocation = newLatLng
+//
+//                        // Add or update marker
+//                        addOrUpdateCurrentLocationMarker(newLatLng)
+//
+//                        // Zoom to location
+//                        mapplsMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(newLatLng, DEFAULT_ZOOM_LEVEL))
+//
+//                        // Find nearby hospitals
+//                        findNearbyHospitals(location.latitude, location.longitude)
+//
+//                        // Remove updates after we get the location
+//                        fusedLocationClient.removeLocationUpdates(this)
+//                    }
+//                }
+//            },
+//            null
+//        )
 //    }
 //
 //    private fun addOrUpdateCurrentLocationMarker(location: LatLng) {
@@ -191,8 +275,7 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //            val iconFactory = IconFactory.getInstance(this)
 //
 //            // Create a blue colored default marker
-//            // Note: If your version of Mappls SDK supports colored markers
-//            val icon = iconFactory.defaultMarker() // Some SDKs have .defaultMarker(COLOR_BLUE)
+//            val icon = iconFactory.defaultMarker()
 //
 //            // Create the marker
 //            currentLocationMarker = map.addMarker(
@@ -306,85 +389,146 @@ package com.kalpesh.women_safety//package com.kalpesh.women_safety
 //    }
 //
 //    private fun addHospitalMarkers(hospitals: List<NearbyAtlasResult>, userLocation: LatLng) {
-//        mapplsMap?.getStyle { style ->
-//            try {
-//                // Clear existing layers and sources
-//                listOf("hospital-layer", "hospital-source").forEach {
-//                    if (style.getLayer(it) != null) style.removeLayer(it)
-//                    if (style.getSource(it) != null) style.removeSource(it)
-//                }
+//        // Clear existing hospital markers
+//        hospitalMarkers.keys.forEach { it.remove() }
+//        hospitalMarkers.clear()
 //
-//                // Start with user location in bounds
-//                val bounds = LatLngBounds.Builder().include(userLocation)
-//                val features = ArrayList<Feature>()
+//        mapplsMap?.let { map ->
+//            val iconFactory = IconFactory.getInstance(this)
 //
-//                // Log all hospitals for debugging
-//                Log.d(TAG, "Processing ${hospitals.size} hospitals")
-//                hospitals.forEach { hospital ->
-//                    Log.d(TAG, "Hospital: ${hospital.placeName}, lat: ${hospital.latitude}, lng: ${hospital.longitude}")
-//                }
-//
-//                // Filter and process valid hospitals
-//                for (hospital in hospitals) {
-//                    // Skip hospitals with null coordinates
-//                    if (hospital.latitude == null || hospital.longitude == null) {
-//                        Log.w(TAG, "Skipping hospital with null coordinates: ${hospital.placeName}")
-//                        continue
-//                    }
-//
-//                    try {
-//                        // Convert to double explicitly to avoid any boxing issues
-//                        val latitude = hospital.latitude!!.toDouble()
-//                        val longitude = hospital.longitude!!.toDouble()
-//
-//                        // Add location to bounds
-//                        val hospitalLocation = LatLng(latitude, longitude)
-//                        bounds.include(hospitalLocation)
-//
-//                        // Create feature for GeoJSON
-//                        val point = Point.fromLngLat(longitude, latitude)
-//                        val feature = Feature.fromGeometry(point)
-//
-//                        // Add properties
-//                        feature.addNumberProperty("radius", 50.0)
-//                        feature.addStringProperty("color", "#FF0000")
-//                        feature.addStringProperty("name", hospital.placeName ?: "Unknown Hospital")
-//                        feature.addStringProperty("address", hospital.placeAddress ?: "No address available")
-//                        feature.addNumberProperty("distance", hospital.distance ?: 0.0)
-//
-//                        features.add(feature)
-//                    } catch (e: Exception) {
-//                        Log.e(TAG, "Error processing hospital ${hospital.placeName}: ${e.message}")
-//                    }
-//                }
-//
-//                if (features.isEmpty()) {
-//                    showToast("No valid hospital locations to display")
-//                    return@getStyle
-//                }
-//
-//                // Create GeoJSON source with features
-//                val featureCollection = FeatureCollection.fromFeatures(features)
-//                val source = GeoJsonSource("hospital-source", featureCollection)
-//                style.addSource(source)
-//
-//                // Add outlined circle layer for hospitals (no fill, only outline)
-//                val circleLayer = CircleLayer("hospital-layer", "hospital-source")
-//                circleLayer.withProperties(
-//                    PropertyFactory.circleRadius(50f),  // Larger radius for hospital area
-//                    PropertyFactory.circleOpacity(0f),  // No fill color (transparent)
-//                    PropertyFactory.circleStrokeWidth(3f), // Border width
-//                    PropertyFactory.circleStrokeColor("#FF0000")  // Red color for border
-//                )
-//                style.addLayer(circleLayer)
-//
-//                // Don't adjust camera here - we only want to see the hospitals
-//                // in relation to the user's current location which is already
-//                // properly centered on the map
+//            // Try to get hospital icon
+//            val hospitalIcon = try {
+//                BitmapUtils.getBitmapFromDrawable(
+//                    ContextCompat.getDrawable(this, R.drawable.ic_hospital)
+//                )?.let { iconFactory.fromBitmap(it) }
 //            } catch (e: Exception) {
-//                Log.e(TAG, "Error in addHospitalMarkers: ${e.message}", e)
-//                showToast("Error displaying hospitals: ${e.localizedMessage}")
+//                Log.e(TAG, "Error creating hospital icon, using default", e)
+//                iconFactory.defaultMarker()
 //            }
+//
+//            // Filter hospitals to keep only nearby ones (within ~30km of user location)
+//            // This prevents markers in other countries/far away from affecting the view
+//            val nearbyHospitals = hospitals.filter { hospital ->
+//                try {
+//                    val lat = hospital.latitude?.toDouble() ?: return@filter false
+//                    val lng = hospital.longitude?.toDouble() ?: return@filter false
+//                    val hospitalLocation = LatLng(lat, lng)
+//
+//                    // Calculate distance between user and hospital
+//                    val distance = calculateDistance(
+//                        userLocation.latitude, userLocation.longitude,
+//                        hospitalLocation.latitude, hospitalLocation.longitude
+//                    )
+//
+//                    // Keep only hospitals within 30km
+//                    distance <= 30000 // 30km in meters
+//                } catch (e: Exception) {
+//                    Log.e(TAG, "Error calculating distance for hospital", e)
+//                    false
+//                }
+//            }
+//
+//            Log.d(TAG, "Filtered to ${nearbyHospitals.size} nearby hospitals out of ${hospitals.size} total")
+//
+//            // Add markers for each nearby hospital
+//            nearbyHospitals.forEach { hospital ->
+//                hospital.latitude?.let { lat ->
+//                    hospital.longitude?.let { lng ->
+//                        val position = LatLng(lat.toDouble(), lng.toDouble())
+//
+//                        // Create marker
+//                        val marker = map.addMarker(
+//                            MarkerOptions()
+//                                .position(position)
+//                                .title(hospital.placeName ?: "Hospital")
+//                                .snippet(hospital.placeAddress ?: "")
+//                                .icon(hospitalIcon)
+//                        )
+//
+//                        // Store marker with its associated hospital data
+//                        hospitalMarkers[marker] = hospital
+//                    }
+//                }
+//            }
+//
+//            // Instead of fitting all markers, just keep the current zoom level
+//            // focused on the user location - this ensures we don't zoom out too far
+//            map.animateCamera(
+//                CameraUpdateFactory.newLatLngZoom(
+//                    userLocation,
+//                    DEFAULT_ZOOM_LEVEL // Use the default zoom level constant
+//                )
+//            )
+//        }
+//    }
+//
+//    // Calculate distance between two geographical points in meters using Haversine formula
+//    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+//        val earthRadius = 6371000.0 // Earth radius in meters
+//
+//        val latDistance = Math.toRadians(lat2 - lat1)
+//        val lngDistance = Math.toRadians(lon2 - lon1)
+//
+//        val a = (Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+//                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+//                * Math.sin(lngDistance / 2) * Math.sin(lngDistance / 2))
+//
+//        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+//
+//        return earthRadius * c
+//    }
+//
+//    // Show dialog to confirm navigation to hospital
+//    private fun showNavigationConfirmDialog(hospitalName: String, latitude: Double, longitude: Double) {
+//        val builder = AlertDialog.Builder(this)
+//        builder.setTitle("Navigate to Hospital")
+//        builder.setMessage("Would you like to navigate to $hospitalName?")
+//
+//        builder.setPositiveButton("Navigate") { dialog, _ ->
+//            dialog.dismiss()
+//            openMapplsForNavigation(latitude, longitude)
+//        }
+//
+//        builder.setNegativeButton("Cancel") { dialog, _ ->
+//            dialog.dismiss()
+//        }
+//
+//        builder.create().show()
+//    }
+//
+//    private fun openMapplsForNavigation(latitude: Double, longitude: Double) {
+//        try {
+//            // Try to open using Mappls app first
+//            val mapplsUri = Uri.parse("mappls://navigate?destination=$latitude,$longitude")
+//            val mapplsIntent = Intent(Intent.ACTION_VIEW, mapplsUri)
+//
+//            // Check if Mappls app is installed
+//            if (mapplsIntent.resolveActivity(packageManager) != null) {
+//                startActivity(mapplsIntent)
+//                return
+//            }
+//
+//            // As a fallback, try Google Maps
+//            val googleUri = Uri.parse("google.navigation:q=$latitude,$longitude")
+//            val googleIntent = Intent(Intent.ACTION_VIEW, googleUri)
+//
+//            if (googleIntent.resolveActivity(packageManager) != null) {
+//                startActivity(googleIntent)
+//                return
+//            }
+//
+//            // General fallback to any maps app
+//            val geoUri = Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude")
+//            val geoIntent = Intent(Intent.ACTION_VIEW, geoUri)
+//
+//            if (geoIntent.resolveActivity(packageManager) != null) {
+//                startActivity(geoIntent)
+//            } else {
+//                showToast("No navigation app found on your device")
+//            }
+//        } catch (e: Exception) {
+//            Log.e(TAG, "Error opening navigation: ${e.message}", e)
+//            showToast("Error starting navigation: ${e.localizedMessage}")
 //        }
 //    }
 //
