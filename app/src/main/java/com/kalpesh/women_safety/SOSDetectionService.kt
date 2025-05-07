@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Location
-import android.location.LocationManager
 import android.os.*
 import android.telephony.SmsManager
 import android.util.Log
@@ -42,6 +41,7 @@ class SOSDetectionService : LifecycleService() {
     private var processCameraProvider: ProcessCameraProvider? = null
     private val database = FirebaseDatabase.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private lateinit var locationManager: EmergencyLocationManager
 
     companion object {
         private const val CHANNEL_ID = "SOS_Service_Channel"
@@ -61,6 +61,9 @@ class SOSDetectionService : LifecycleService() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         setupWakeLock()
+
+        // Initialize our location manager
+        locationManager = EmergencyLocationManager.getInstance(this)
     }
 
     private fun setupWakeLock() {
@@ -91,6 +94,10 @@ class SOSDetectionService : LifecycleService() {
 
     private fun startDetection() {
         startForeground(NOTIFICATION_ID, createMonitoringNotification())
+
+        // Start location updates immediately to ensure we have fresh location data
+        locationManager.startLocationUpdates()
+
         startCamera()
         isServiceRunning = true
     }
@@ -105,6 +112,10 @@ class SOSDetectionService : LifecycleService() {
             imageAnalysis?.clearAnalyzer()
             camera?.cameraControl?.enableTorch(false)
             processCameraProvider?.unbindAll()
+
+            // Stop location updates to save battery
+            locationManager.stopLocationUpdates()
+
             if (wakeLock.isHeld) wakeLock.release()
             cameraExecutor.shutdown()
         } catch (e: Exception) {
@@ -172,7 +183,6 @@ class SOSDetectionService : LifecycleService() {
     }
 
     @androidx.annotation.OptIn(ExperimentalGetImage::class)
-    @OptIn(ExperimentalGetImage::class)
     private fun createFaceAnalyzer(): ImageAnalysis.Analyzer {
         val options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -243,29 +253,6 @@ class SOSDetectionService : LifecycleService() {
         return match
     }
 
-//    private fun triggerSOS() {
-//        // Vibration
-//        vibrate()
-//
-//        val userId = FirebaseAuth.getInstance().currentUser.toString()
-//        val location = getLastKnownLocation()
-//
-//        if (userId == null || location == null) {
-//            logSOSFailure("User or Location Not Available")
-//            return
-//        }
-//
-//        // Prepare SOS data
-//        val sosMessage = createSOSMessage(location)
-//        val sosData = createSOSData(userId, location)
-//
-//        // Send SMS
-//
-//        sendEmergencySMS(sosMessage)
-//
-//        // Send to Firebase
-//        sendFirebaseSosAlert(sosData)
-//    }
     private fun triggerSOS() {
         // Always vibrate first for immediate feedback
         vibrate()
@@ -277,22 +264,23 @@ class SOSDetectionService : LifecycleService() {
             return
         }
 
-        // Get location with fallbacks
-        val location = getLastKnownLocation() ?: run {
-            // Create default location if unavailable
-            Location("default").apply {
-                latitude = 0.0
-                longitude = 0.0
-            }
+        // Use our location manager to get the best available location
+        val location = locationManager.getLastKnownLocation()
+
+        // Log location quality
+        if (location.provider == "default_fallback") {
+            Log.w(TAG, "Using fallback location coordinates - may not be accurate")
+        } else {
+            Log.d(TAG, "Using location from provider: ${location.provider}")
         }
 
-    // Prepare and send alerts
-    val sosMessage = createSOSMessage(location)
-    val sosData = createSOSData(userId, location)
+        // Prepare and send alerts
+        val sosMessage = createSOSMessage(location)
+        val sosData = createSOSData(userId, location)
 
-    sendEmergencySMS(sosMessage)
-    sendFirebaseSosAlert(sosData)
-}
+        sendEmergencySMS(sosMessage)
+        sendFirebaseSosAlert(sosData)
+    }
 
     private fun vibrate() {
         try {
@@ -318,7 +306,10 @@ class SOSDetectionService : LifecycleService() {
         "latitude" to location.latitude,
         "longitude" to location.longitude,
         "timestamp" to System.currentTimeMillis(),
-        "userId" to userId
+        "userId" to userId,
+        "locationProvider" to (location.provider ?: "unknown"),
+        "locationAccuracy" to (if (location.hasAccuracy()) location.accuracy else -1f),
+        "locationTime" to location.time
     )
 
     private fun sendEmergencySMS(message: String) {
@@ -365,49 +356,6 @@ class SOSDetectionService : LifecycleService() {
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(2, notification)
     }
-
-//    private fun getLastKnownLocation(): Location? {
-//        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-//
-//        return try {
-//            if (checkLocationPermission()) {
-//                locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-//                    ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-//            } else null
-//        } catch (e: Exception) {
-//            Log.e(TAG, "Location retrieval error", e)
-//            null
-//        }
-//    }
-
-    private fun getLastKnownLocation(): Location? {
-        return try {
-            val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-            if (checkLocationPermission()) {
-                // Try GPS first, then network
-                locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                    ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                    ?: Location("manual").apply {
-                        latitude = 0.0
-                        longitude = 0.0
-                    }
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Location error", e)
-            null
-        }
-    }
-
-    private fun checkLocationPermission(): Boolean =
-        ActivityCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-                ActivityCompat.checkSelfPermission(
-                    this, Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
 
     override fun onDestroy() {
         super.onDestroy()
