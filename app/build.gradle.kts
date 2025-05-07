@@ -31,6 +31,9 @@ android {
             )
         }
     }
+    buildFeatures {
+        viewBinding = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -70,6 +73,7 @@ dependencies {
     implementation("io.coil-kt:coil:2.4.0")
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.play.services.places)
+    implementation(libs.generativeai)
 
     val cameraxVersion = "1.3.1"
     implementation("androidx.camera:camera-core:$cameraxVersion")

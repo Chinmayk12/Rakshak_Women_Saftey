@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
     private var isVoiceSOSActive = false
     private val predefinedWords = listOf("help", "help me", "danger","बचाओ", "बचाओ मुझे", "सहायता", "खतरा",
         "वाचवा", "मदत करा", "धोक्याचा इशारा", "मदत" )
-    val policePhoneNumber = "+917841818938"
+    val policePhoneNumber = "+918010944027"
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 101
@@ -258,7 +258,7 @@ class MainActivity : AppCompatActivity() {
 
 
         // List of emergency contacts (replace with real numbers)
-        val emergencyContacts = listOf("8007003864", "7841818938")
+        val emergencyContacts = listOf("8010944027", "8265004346")
 
         for (contact in emergencyContacts) {
             sendSMS(contact, sosMessage)

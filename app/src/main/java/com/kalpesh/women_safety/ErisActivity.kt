@@ -70,7 +70,8 @@ class ErisActivity : AppCompatActivity() {
         val requiredPermissions = mutableListOf(
             Manifest.permission.CAMERA,
             Manifest.permission.SEND_SMS,
-            Manifest.permission.VIBRATE
+            Manifest.permission.VIBRATE,
+            Manifest.permission.ACCESS_FINE_LOCATION
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -93,10 +94,11 @@ class ErisActivity : AppCompatActivity() {
         isDetecting = false
         calibrationBlinkPattern.clear()
         blinkCount = 0
-        gestureStatus.text = "Calibrating: Blink 3 times..."
-        instructionsText.text = "Blink naturally 3 times"
+        gestureStatus.text = "Calibrating: Blink 5 times..."  // Updated to 5 blinks
+        instructionsText.text = "Blink naturally 5 times"  // Update instructions
         toggleDetectionButton.text = "Start Detection"
     }
+
 
     private fun startBackgroundDetection() {
         val serviceIntent = Intent(this, SOSDetectionService::class.java).apply {
@@ -257,15 +259,16 @@ class ErisActivity : AppCompatActivity() {
         }
         blinkCount++
 
-        if (blinkCount >= 3) {
+        if (blinkCount >= 5) {  // 5 Blinks
             isCalibrating = false
             Toast.makeText(this, "Calibration Complete!", Toast.LENGTH_SHORT).show()
             gestureStatus.text = "Calibration Complete!"
             instructionsText.text = "Pattern stored. Tap 'Start Detection' to begin monitoring"
         } else {
-            gestureStatus.text = "Calibrating: ${3 - blinkCount} blinks remaining..."
+            gestureStatus.text = "Calibrating: ${5 - blinkCount} blinks remaining..."  // Update instruction
         }
     }
+
 
     override fun onRequestPermissionsResult(
         requestCode: Int,

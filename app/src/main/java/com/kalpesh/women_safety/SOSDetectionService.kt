@@ -28,6 +28,8 @@ import java.util.concurrent.Executors
 import kotlin.math.abs
 import android.os.VibrationEffect
 import android.os.Build
+import com.google.firebase.FirebaseApp
+
 class SOSDetectionService : LifecycleService() {
     private lateinit var cameraExecutor: ExecutorService
     private var calibrationPattern: List<Long> = listOf()
@@ -50,6 +52,7 @@ class SOSDetectionService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        FirebaseApp.initializeApp(this)
         initializeServiceComponents()
     }
 
@@ -139,10 +142,10 @@ class SOSDetectionService : LifecycleService() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("SOS Detection Active")
-            .setContentText(contentText)
+            .setContentText("Monitoring for emergency blinks")
             .setSmallIcon(R.drawable.ic_notifications)
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
@@ -227,34 +230,69 @@ class SOSDetectionService : LifecycleService() {
     private fun patternsMatch(): Boolean {
         if (currentBlinkPattern.size != calibrationPattern.size) return false
 
-        return currentBlinkPattern.zip(calibrationPattern).all { (current, calibration) ->
+        val match = currentBlinkPattern.zip(calibrationPattern).all { (current, calibration) ->
             abs(current - calibration) <= calibration * 0.5
         }
+
+        if (match) {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(applicationContext, "SOS Triggered!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        return match
     }
 
+//    private fun triggerSOS() {
+//        // Vibration
+//        vibrate()
+//
+//        val userId = FirebaseAuth.getInstance().currentUser.toString()
+//        val location = getLastKnownLocation()
+//
+//        if (userId == null || location == null) {
+//            logSOSFailure("User or Location Not Available")
+//            return
+//        }
+//
+//        // Prepare SOS data
+//        val sosMessage = createSOSMessage(location)
+//        val sosData = createSOSData(userId, location)
+//
+//        // Send SMS
+//
+//        sendEmergencySMS(sosMessage)
+//
+//        // Send to Firebase
+//        sendFirebaseSosAlert(sosData)
+//    }
     private fun triggerSOS() {
-        // Vibration
+        // Always vibrate first for immediate feedback
         vibrate()
 
-        val userId = FirebaseAuth.getInstance().currentUser.toString()
-        val location = getLastKnownLocation()
-
-        if (userId == null || location == null) {
-            logSOSFailure("User or Location Not Available")
+        // Get current user (works both foreground/background)
+        val user = auth.currentUser
+        val userId = user?.uid ?: run {
+            logSOSFailure("User not authenticated")
             return
         }
 
-        // Prepare SOS data
-        val sosMessage = createSOSMessage(location)
-        val sosData = createSOSData(userId, location)
+        // Get location with fallbacks
+        val location = getLastKnownLocation() ?: run {
+            // Create default location if unavailable
+            Location("default").apply {
+                latitude = 0.0
+                longitude = 0.0
+            }
+        }
 
-        // Send SMS
+    // Prepare and send alerts
+    val sosMessage = createSOSMessage(location)
+    val sosData = createSOSData(userId, location)
 
-        sendEmergencySMS(sosMessage)
-
-        // Send to Firebase
-        sendFirebaseSosAlert(sosData)
-    }
+    sendEmergencySMS(sosMessage)
+    sendFirebaseSosAlert(sosData)
+}
 
     private fun vibrate() {
         try {
@@ -284,7 +322,7 @@ class SOSDetectionService : LifecycleService() {
     )
 
     private fun sendEmergencySMS(message: String) {
-        val emergencyContacts = listOf("8007003864", "7841818938")
+        val emergencyContacts = listOf("8010944027","8265004346")
 
         emergencyContacts.forEach { contact ->
             try {
@@ -328,16 +366,37 @@ class SOSDetectionService : LifecycleService() {
         notificationManager.notify(2, notification)
     }
 
-    private fun getLastKnownLocation(): Location? {
-        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+//    private fun getLastKnownLocation(): Location? {
+//        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+//
+//        return try {
+//            if (checkLocationPermission()) {
+//                locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+//                    ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+//            } else null
+//        } catch (e: Exception) {
+//            Log.e(TAG, "Location retrieval error", e)
+//            null
+//        }
+//    }
 
+    private fun getLastKnownLocation(): Location? {
         return try {
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
             if (checkLocationPermission()) {
+                // Try GPS first, then network
                 locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                     ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            } else null
+                    ?: Location("manual").apply {
+                        latitude = 0.0
+                        longitude = 0.0
+                    }
+            } else {
+                null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Location retrieval error", e)
+            Log.e(TAG, "Location error", e)
             null
         }
     }
