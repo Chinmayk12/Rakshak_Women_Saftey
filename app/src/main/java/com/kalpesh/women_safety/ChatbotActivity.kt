@@ -1,6 +1,8 @@
 package com.kalpesh.women_safety
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.ai.client.generativeai.GenerativeModel
@@ -14,6 +16,7 @@ import kotlinx.coroutines.withContext
 class ChatbotActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityChatbotBinding
+    private lateinit var currentLocationOnMap: ImageView
     private lateinit var chatAdapter: ChatAdapter
     private val chatMessages = mutableListOf<ChatMessage>()
     private lateinit var generativeModel: GenerativeModel
@@ -23,6 +26,12 @@ class ChatbotActivity : AppCompatActivity() {
         binding = ActivityChatbotBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        currentLocationOnMap = findViewById(R.id.location_icon)
+
+        currentLocationOnMap.setOnClickListener{
+            val intent = Intent(this, CurrentLocationMap::class.java)
+            startActivity(intent)
+        }
         // Initialize Gemini
         generativeModel = GenerativeModel(
             modelName = "gemini-2.0-flash",
