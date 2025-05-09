@@ -48,11 +48,13 @@
 
         <!-- Notification Icon -->
         <ImageView
-            android:id="@+id/notification_icon"
+            android:id="@+id/logoutBtn"
             android:layout_width="30dp"
             android:layout_height="30dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
             app:tint="@color/white"
-            android:src="@drawable/baseline_notifications_none_24"
+            android:src="@drawable/baseline_logout_24"
             android:contentDescription="Notification Icon" />
     </LinearLayout>
     <WebView

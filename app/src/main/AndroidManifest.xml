@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools" >
     <!-- Permissions -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
@@ -8,8 +8,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED">
-        1
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" >
     </uses-permission>
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -66,7 +65,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Women_safety"
-        tools:targetApi="31">
+        tools:targetApi="31" >
+
         <activity
             android:name=".ForgotPassword"
             android:exported="false" />
@@ -99,9 +99,6 @@
         <activity
             android:name=".HealthParamterActivity"
             android:exported="false" />
-        <activity
-            android:name=".VBlogActivity"
-            android:exported="false" />
 
         <meta-data
             android:name="com.mappls.sdk.API_KEY"
@@ -109,16 +106,13 @@
 
         <activity
             android:name=".SplashScreen"
-            android:exported="true">
+            android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".fullblogActivity"
-            android:exported="false" />
         <activity
             android:name=".BlogActivity"
             android:exported="false" />

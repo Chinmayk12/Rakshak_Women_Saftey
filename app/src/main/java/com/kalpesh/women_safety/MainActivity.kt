@@ -4,20 +4,27 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
+import android.content.ContentValues.TAG
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
+import android.util.Log
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,13 +32,18 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 
 class MainActivity : AppCompatActivity() {
 
+    private var emergencyContacts: List<String> = emptyList()
     private lateinit var btnManualSOS: ImageButton
     private lateinit var btnToggleVoiceSOS: Button
+    private lateinit var logoutButton: ImageView
     private lateinit var btnpolicecall: ImageButton
     private lateinit var currentLocationOnMap: ImageView
     private lateinit var emergencyButton: ImageButton
@@ -45,24 +57,29 @@ class MainActivity : AppCompatActivity() {
     private var isVoiceSOSActive = false
     private val predefinedWords = listOf("help", "help me", "danger","बचाओ", "बचाओ मुझे", "सहायता", "खतरा",
         "वाचवा", "मदत करा", "धोक्याचा इशारा", "मदत" )
-    val policePhoneNumber = "+918010944027"
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 101
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        fetchEmergencyContacts()
+
         setContentView(R.layout.activity_main)
+
         btnprofile = findViewById(R.id.personalinfobtn)
         btnpolicecall = findViewById(R.id.callpolicebtn)
         emergencyButton = findViewById(R.id.emergencybtn)
         personalInformationText = findViewById(R.id.personalInformationText)
         btnManualSOS = findViewById(R.id.btnManualSOS)
+        logoutButton = findViewById(R.id.logoutBtn)
         currentLocationOnMap = findViewById(R.id.location_icon)
         btnToggleVoiceSOS = findViewById(R.id.toggleVoiceSOS)
         btnnearbyhospital = findViewById(R.id.nearbyhospitalbtn)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
 
         if (!hasPermissions()) {
             requestPermissions()
@@ -91,6 +108,25 @@ class MainActivity : AppCompatActivity() {
         currentLocationOnMap.setOnClickListener{
             val intent = Intent(this, CurrentLocationMap::class.java)
             startActivity(intent)
+        }
+
+        logoutButton.setOnClickListener {
+
+            AlertDialog.Builder(this)
+                .setTitle("Sign Out")
+                .setMessage("Are you sure you want to sign out?")
+                .setPositiveButton("Yes") { dialog, _ ->
+                    FirebaseAuth.getInstance().signOut()
+                    // Optional: Clear activity stack and go to login screen
+                    val intent = Intent(this, Login::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                }
+                .setNegativeButton("No") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .show()
         }
 
         btnToggleVoiceSOS.setOnClickListener {
@@ -174,6 +210,25 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    }
+    private fun fetchEmergencyContacts() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val database = FirebaseDatabase.getInstance().getReference("Users")
+        database.child(userId).addListenerForSingleValueEvent(/* listener = */ object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val contactList = mutableListOf<String>()
+                val contact1 = snapshot.child("emergencyContact1").getValue(String::class.java)
+                val contact2 = snapshot.child("emergencyContact2").getValue(String::class.java)
+                if (!contact1.isNullOrBlank()) contactList.add(contact1)
+                if (!contact2.isNullOrBlank()) contactList.add(contact2)
+                emergencyContacts = contactList
+                Log.d(TAG, "Emergency contacts cached: $emergencyContacts")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                //Toast.makeText(@ErisAndTapDetectionTestingActivity, "Error fetching contacts: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 
     private fun hasPermissions(): Boolean {
@@ -299,9 +354,9 @@ class MainActivity : AppCompatActivity() {
 
 
         // List of emergency contacts (replace with real numbers)
-        val emergencyContacts = listOf("8010944027", "")
+        val Contacts = emergencyContacts
 
-        for (contact in emergencyContacts) {
+        for (contact in Contacts) {
             sendSMS(contact, sosMessage)
         }
 

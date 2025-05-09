@@ -21,6 +21,11 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
@@ -49,9 +54,18 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
     private var isCalibrating = false
     private var isDetecting = false
     private var calibrationBlinkPattern = mutableListOf<Long>()
-    private var currentBlinkPattern = mutableListOf<Long>()
     private var lastBlinkTime: Long = 0
     private var blinkCount = 0
+    private var calibrationStartTime: Long = 0
+
+    private val MAX_CALIBRATION_BLINK_DURATION = 3000L // 3 seconds for 5 blinks
+    private val TAP_THRESHOLD = 5.5f // Accelerometer Z-axis tap threshold (tune as needed)
+    private val ROTATION_THRESHOLD = 2.0f // Gyroscope threshold (tune as needed)
+    private val TAP_COOLDOWN = 300 // milliseconds between taps
+    private var filteredZ = 0f
+    private val FILTER_ALPHA = 0.9f
+    private var lastGyroMagnitude = 0f
+    private lateinit var gyroscope: Sensor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,15 +124,33 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
     override fun onSensorChanged(event: SensorEvent) {
         if (!isTestingTaps && !isDetecting) return
 
-        val x = event.values[0]
-        val y = event.values[1]
-        val z = event.values[2]
+        when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                val z = event.values[2]
+                val zWithoutGravity = z - SensorManager.GRAVITY_EARTH
 
-        // Calculate acceleration magnitude
-        val acceleration = Math.sqrt(x * x + y * y + z * z.toDouble()) - SensorManager.GRAVITY_EARTH
+                // High-pass filter to remove slow movements
+                filteredZ = FILTER_ALPHA * filteredZ + (1 - FILTER_ALPHA) * zWithoutGravity
+                val highPass = zWithoutGravity - filteredZ
 
-        if (acceleration > 7.5f) { // Threshold for tap detection
-            handlePhoneTap()
+                val currentTime = System.currentTimeMillis()
+
+                // Only fire if rotation is very low (i.e., not a shake/tilt)
+                if (Math.abs(highPass) > TAP_THRESHOLD && lastGyroMagnitude < ROTATION_THRESHOLD) {
+                    if (currentTime - lastTapTime > TAP_COOLDOWN) {
+                        handlePhoneTap()
+                        lastTapTime = currentTime
+                    }
+                }
+            }
+            Sensor.TYPE_GYROSCOPE -> {
+                // Use the largest axis as the rotation magnitude
+                lastGyroMagnitude = maxOf(
+                    Math.abs(event.values[0]),
+                    Math.abs(event.values[1]),
+                    Math.abs(event.values[2])
+                )
+            }
         }
     }
 
@@ -206,6 +238,10 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
     private fun setupSensors() {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)!!
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)!!
+        // Register both listeners in onResume():
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
+        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
     private fun startCalibration() {
@@ -213,8 +249,9 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
         isDetecting = false
         calibrationBlinkPattern.clear()
         blinkCount = 0
-        gestureStatus.text = "Calibrating: Blink 5 times..."  // Updated to 5 blinks
-        instructionsText.text = "Blink naturally 5 times"  // Update instructions
+        calibrationStartTime = System.currentTimeMillis() // NEW: Start time
+        gestureStatus.text = "Calibrating: Blink 5 times quickly..."
+        instructionsText.text = "Blink rapidly 5 times (within 3 seconds)"
         toggleDetectionButton.text = "Start Detection"
     }
 
@@ -395,12 +432,23 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
         blinkCount++
 
         if (blinkCount >= 5) {  // 5 Blinks
-            isCalibrating = false
-            Toast.makeText(this, "Calibration Complete!", Toast.LENGTH_SHORT).show()
-            gestureStatus.text = "Calibration Complete!"
-            instructionsText.text = "Pattern stored. Tap 'Start Detection' to begin monitoring"
+            val totalDuration = currentTime - calibrationStartTime
+            if (totalDuration <= MAX_CALIBRATION_BLINK_DURATION) {
+                isCalibrating = false
+                Toast.makeText(this, "Calibration Complete!", Toast.LENGTH_SHORT).show()
+                gestureStatus.text = "Calibration Complete!"
+                instructionsText.text = "Pattern stored. Tap 'Start Detection' to begin monitoring"
+            } else {
+                // Too slow! Fail calibration
+                isCalibrating = false
+                calibrationBlinkPattern.clear()
+                blinkCount = 0
+                Toast.makeText(this, "Calibration too slow! Blink 5 times rapidly.", Toast.LENGTH_SHORT).show()
+                gestureStatus.text = "Calibration Failed: Too slow"
+                instructionsText.text = "Try again: Blink rapidly 5 times"
+            }
         } else {
-            gestureStatus.text = "Calibrating: ${5 - blinkCount} blinks remaining..."  // Update instruction
+            gestureStatus.text = "Calibrating: ${5 - blinkCount} blinks remaining..."
         }
     }
 
@@ -432,9 +480,10 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
 
     override fun onDestroy() {
         super.onDestroy()
-        cameraExecutor.shutdown()
         sensorManager.unregisterListener(this)
+        cameraExecutor.shutdown()
     }
+
 
     companion object {
         private const val TAG = "ErisActivity"

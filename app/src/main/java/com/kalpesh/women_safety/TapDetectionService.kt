@@ -1,6 +1,7 @@
 package com.kalpesh.women_safety
 
 import android.app.*
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -17,12 +18,18 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import kotlin.math.abs
+import kotlin.math.max
 
 class TapDetectionService : LifecycleService(), SensorEventListener {
+    private var EmergencyContacts: List<String> = emptyList()
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
+    private var gyroscope: Sensor? = null
 
     // Tap pattern detection variables
     private var tapPattern = mutableListOf<Long>()
@@ -35,9 +42,15 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
     private val auth = FirebaseAuth.getInstance()
     private lateinit var locationManager: EmergencyLocationManager
 
-    // For tap detection - REDUCED THRESHOLD to match ErisActivity
-    private val tapThreshold = 7.5f // Matching ErisActivity's threshold
-    private val cooldownPeriod = 500L // Same as in ErisActivity
+    // Sensor fusion variables
+    private var filteredZ = 0f
+    private val FILTER_ALPHA = 0.9f // less aggressive filter for taps
+    private var lastGyroMagnitude = 0f
+
+    // Tap detection thresholds (tune as needed)
+    private val tapThreshold = 5.5f // Lowered for sensitivity
+    private val rotationThreshold =  2.0f // Allow some rotation
+    private val cooldownPeriod = 300L // ms
 
     companion object {
         private const val CHANNEL_ID = "TapSOS_Service_Channel"
@@ -50,6 +63,29 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
         super.onCreate()
         FirebaseApp.initializeApp(this)
         initializeServiceComponents()
+        fetchEmergencyContacts()
+
+    }
+
+    private fun fetchEmergencyContacts() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val database = FirebaseDatabase.getInstance().getReference("Users")
+        database.child(userId).addListenerForSingleValueEvent(/* listener = */ object :
+            ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val contactList = mutableListOf<String>()
+                val contact1 = snapshot.child("emergencyContact1").getValue(String::class.java)
+                val contact2 = snapshot.child("emergencyContact2").getValue(String::class.java)
+                if (!contact1.isNullOrBlank()) contactList.add(contact1)
+                if (!contact2.isNullOrBlank()) contactList.add(contact2)
+                EmergencyContacts = contactList
+                Log.d(ContentValues.TAG, "Emergency contacts cached: $EmergencyContacts")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                //Toast.makeText(@ErisAndTapDetectionTestingActivity, "Error fetching contacts: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 
     private fun initializeServiceComponents() {
@@ -65,9 +101,13 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
     private fun setupSensors() {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
         if (accelerometer == null) {
             Log.e(TAG, "No accelerometer found on device")
+        }
+        if (gyroscope == null) {
+            Log.e(TAG, "No gyroscope found on device")
         }
     }
 
@@ -105,16 +145,23 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
         // Start location updates immediately to ensure we have fresh location data
         locationManager.startLocationUpdates()
 
-        // Register sensor listener
+        // Register sensor listeners
         accelerometer?.let {
             sensorManager.registerListener(
                 this,
                 it,
-                SensorManager.SENSOR_DELAY_NORMAL
+                SensorManager.SENSOR_DELAY_GAME // More frequent updates
             )
-            isServiceRunning = true
-            Log.d(TAG, "Tap detection started with threshold: $tapThreshold")
         }
+        gyroscope?.let {
+            sensorManager.registerListener(
+                this,
+                it,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+        }
+        isServiceRunning = true
+        Log.d(TAG, "Tap detection started with threshold: $tapThreshold, rotation threshold: $rotationThreshold")
     }
 
     private fun stopDetection() {
@@ -173,25 +220,42 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            detectTap(event)
+        when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                detectTapWithFusion(event)
+            }
+            Sensor.TYPE_GYROSCOPE -> {
+                // Use the largest axis as the rotation magnitude
+                lastGyroMagnitude = maxOf(
+                    abs(event.values[0]),
+                    abs(event.values[1]),
+                    abs(event.values[2])
+                )
+            }
         }
     }
 
-    private fun detectTap(event: SensorEvent) {
-        val x = event.values[0]
-        val y = event.values[1]
-        val z = event.values[2]
+    private fun detectTapWithFusion(event: SensorEvent) {
+        // Only proceed if service is running
+        if (!isServiceRunning) return
 
-        // Calculate acceleration magnitude
-        val acceleration = Math.sqrt(x * x + y * y + z * z.toDouble()) - SensorManager.GRAVITY_EARTH
+        val z = event.values[2]
+        val zWithoutGravity = z - SensorManager.GRAVITY_EARTH
+
+        // High-pass filter to remove slow movements
+        filteredZ = FILTER_ALPHA * filteredZ + (1 - FILTER_ALPHA) * zWithoutGravity
+        val highPass = zWithoutGravity - filteredZ
 
         val currentTime = System.currentTimeMillis()
+        Log.d(TAG, "TapDetectionService highPass: $highPass, gyro: $lastGyroMagnitude")
 
-        // Match the logic from ErisActivity for consistency
-        if (acceleration > tapThreshold && (currentTime - lastTapTime > cooldownPeriod)) {
-            Log.d(TAG, "Tap detected with acceleration: $acceleration")
-            handlePhoneTap()
+        // Only fire if rotation is very low (i.e., not a shake/tilt)
+        if (abs(highPass) > tapThreshold && lastGyroMagnitude < rotationThreshold) {
+            if (currentTime - lastTapTime > cooldownPeriod) {
+                Log.d(TAG, "Tap detected with highPass: $highPass and gyro: $lastGyroMagnitude")
+                handlePhoneTap()
+                lastTapTime = currentTime
+            }
         }
     }
 
@@ -200,7 +264,7 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
         val timeSinceLastTap = currentTime - lastTapTime
 
         // Process tap following the same logic as in ErisActivity
-        if (timeSinceLastTap > 500) { // Prevent multiple detections for same tap
+        if (timeSinceLastTap > cooldownPeriod) { // Prevent multiple detections for same tap
             Log.d(TAG, "Processing tap with interval: $timeSinceLastTap")
 
             if (tapPattern.isEmpty()) {
@@ -217,7 +281,7 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
 
             // Debug log the current pattern
             Log.d(TAG, "Current tap pattern: $tapPattern")
-            if (!calibrationTapPattern.isEmpty()) {
+            if (calibrationTapPattern.isNotEmpty()) {
                 Log.d(TAG, "Calibration tap pattern: $calibrationTapPattern")
             }
 
@@ -313,7 +377,7 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
     )
 
     private fun sendEmergencySMS(message: String) {
-        val emergencyContacts = listOf("8010944027","")
+        val emergencyContacts = EmergencyContacts
 
         emergencyContacts.forEach { contact ->
             try {

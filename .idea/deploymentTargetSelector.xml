@@ -16,6 +16,9 @@
       <SelectionState runConfigName="SafetyMapActivity">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
+      <SelectionState runConfigName="ErisAndTapDetectionTestingActivity">
+        <option name="selectionMode" value="DROPDOWN" />
+      </SelectionState>
     </selectionStates>
   </component>
 </project>

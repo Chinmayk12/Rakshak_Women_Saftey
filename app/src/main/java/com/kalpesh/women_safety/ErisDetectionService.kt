@@ -1,7 +1,7 @@
 package com.kalpesh.women_safety
 
-
 import android.app.*
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -26,12 +26,19 @@ import kotlin.math.abs
 import android.os.VibrationEffect
 import android.os.Build
 import com.google.firebase.FirebaseApp
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 
 class ErisDetectionService : LifecycleService() {
     private lateinit var cameraExecutor: ExecutorService
     private var calibrationPattern: List<Long> = listOf()
     private var currentBlinkPattern = mutableListOf<Long>()
+    private var EmergencyContacts: List<String> = emptyList()
     private var lastBlinkTime: Long = 0
+    private var calibrationStartTime: Long = 0
+    private val MAX_BLINK_PATTERN_DURATION = 3000L // 3 seconds for rapid blinks
+
     private lateinit var wakeLock: PowerManager.WakeLock
     private lateinit var vibrator: Vibrator
     private var camera: Camera? = null
@@ -40,6 +47,11 @@ class ErisDetectionService : LifecycleService() {
     private val database = FirebaseDatabase.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private lateinit var locationManager: EmergencyLocationManager
+
+    // Blink calibration mode
+    private var isCalibrating = false
+    private var calibrationBlinkCount = 0
+    private val calibrationBlinkPattern = mutableListOf<Long>()
 
     companion object {
         private const val CHANNEL_ID = "SOS_Service_Channel"
@@ -50,6 +62,8 @@ class ErisDetectionService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        fetchEmergencyContacts()
+
         FirebaseApp.initializeApp(this)
         initializeServiceComponents()
     }
@@ -59,9 +73,27 @@ class ErisDetectionService : LifecycleService() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         setupWakeLock()
-
-        // Initialize our location manager
         locationManager = EmergencyLocationManager.getInstance(this)
+    }
+    private fun fetchEmergencyContacts() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val database = FirebaseDatabase.getInstance().getReference("Users")
+        database.child(userId).addListenerForSingleValueEvent(/* listener = */ object :
+            ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val contactList = mutableListOf<String>()
+                val contact1 = snapshot.child("emergencyContact1").getValue(String::class.java)
+                val contact2 = snapshot.child("emergencyContact2").getValue(String::class.java)
+                if (!contact1.isNullOrBlank()) contactList.add(contact1)
+                if (!contact2.isNullOrBlank()) contactList.add(contact2)
+                EmergencyContacts = contactList
+                Log.d(ContentValues.TAG, "Emergency contacts cached: $EmergencyContacts")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                //Toast.makeText(@ErisAndTapDetectionTestingActivity, "Error fetching contacts: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 
     private fun setupWakeLock() {
@@ -81,6 +113,15 @@ class ErisDetectionService : LifecycleService() {
             "START_DETECTION" -> {
                 intent.getLongArrayExtra("calibrationPattern")?.let { pattern ->
                     calibrationPattern = pattern.toList()
+                    isCalibrating = false
+                    startDetection()
+                }
+                // For calibration mode, set up here as needed
+                if (intent.getBooleanExtra("startCalibration", false)) {
+                    isCalibrating = true
+                    calibrationBlinkCount = 0
+                    calibrationBlinkPattern.clear()
+                    calibrationStartTime = System.currentTimeMillis()
                     startDetection()
                 }
             }
@@ -92,10 +133,7 @@ class ErisDetectionService : LifecycleService() {
 
     private fun startDetection() {
         startForeground(NOTIFICATION_ID, createMonitoringNotification())
-
-        // Start location updates immediately to ensure we have fresh location data
         locationManager.startLocationUpdates()
-
         startCamera()
         isServiceRunning = true
     }
@@ -110,10 +148,7 @@ class ErisDetectionService : LifecycleService() {
             imageAnalysis?.clearAnalyzer()
             camera?.cameraControl?.enableTorch(false)
             processCameraProvider?.unbindAll()
-
-            // Stop location updates to save battery
             locationManager.stopLocationUpdates()
-
             if (wakeLock.isHeld) wakeLock.release()
             cameraExecutor.shutdown()
         } catch (e: Exception) {
@@ -162,7 +197,6 @@ class ErisDetectionService : LifecycleService() {
         ProcessCameraProvider.getInstance(this).addListener({
             try {
                 processCameraProvider = ProcessCameraProvider.getInstance(this).get()
-
                 imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -219,60 +253,79 @@ class ErisDetectionService : LifecycleService() {
     private fun handleBlink() {
         val currentTime = System.currentTimeMillis()
 
+        if (isCalibrating) {
+            // Calibration mode: only accept if fast 5 blinks
+            if (calibrationBlinkCount > 0) {
+                calibrationBlinkPattern.add(currentTime - lastBlinkTime)
+            }
+            calibrationBlinkCount++
+
+            if (calibrationBlinkCount >= 5) {
+                val totalDuration = currentTime - calibrationStartTime
+                if (totalDuration <= MAX_BLINK_PATTERN_DURATION) {
+                    // Store calibrated pattern to database or shared preferences as needed
+                    // For demonstration, just log it
+                    Log.d(TAG, "Rapid blink calibration complete: $calibrationBlinkPattern")
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(applicationContext, "Blink Calibration Complete!", Toast.LENGTH_SHORT).show()
+                    }
+                    // Optionally stop calibration mode
+                    isCalibrating = false
+                } else {
+                    calibrationBlinkPattern.clear()
+                    calibrationBlinkCount = 0
+                    calibrationStartTime = System.currentTimeMillis()
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(applicationContext, "Calibration too slow! Blink rapidly 5 times.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            lastBlinkTime = currentTime
+            return
+        }
+
+        // Detection mode (not calibrating)
         if (currentTime - lastBlinkTime > 500) {
             currentBlinkPattern.add(currentTime - lastBlinkTime)
-
             if (currentBlinkPattern.size > calibrationPattern.size) {
                 currentBlinkPattern.removeAt(0)
             }
-
             if (currentBlinkPattern.size == calibrationPattern.size && patternsMatch()) {
                 triggerSOS()
                 currentBlinkPattern.clear()
             }
-
             lastBlinkTime = currentTime
         }
     }
 
     private fun patternsMatch(): Boolean {
         if (currentBlinkPattern.size != calibrationPattern.size) return false
-
         val match = currentBlinkPattern.zip(calibrationPattern).all { (current, calibration) ->
             abs(current - calibration) <= calibration * 0.5
         }
-
         if (match) {
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(applicationContext, "SOS Triggered!", Toast.LENGTH_SHORT).show()
             }
         }
-
         return match
     }
 
     private fun triggerSOS() {
-        // Always vibrate first for immediate feedback
         vibrate()
-
-        // Get current user (works both foreground/background)
         val user = auth.currentUser
         val userId = user?.uid ?: run {
             logSOSFailure("User not authenticated")
             return
         }
 
-        // Use our location manager to get the best available location
         val location = locationManager.getLastKnownLocation()
-
-        // Log location quality
         if (location.provider == "default_fallback") {
             Log.w(TAG, "Using fallback location coordinates - may not be accurate")
         } else {
             Log.d(TAG, "Using location from provider: ${location.provider}")
         }
 
-        // Prepare and send alerts
         val sosMessage = createSOSMessage(location)
         val sosData = createSOSData(userId, location)
 
@@ -283,11 +336,9 @@ class ErisDetectionService : LifecycleService() {
     private fun vibrate() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // For Android Oreo and above
                 val vibrationEffect = VibrationEffect.createOneShot(10000, VibrationEffect.DEFAULT_AMPLITUDE)
                 vibrator.vibrate(vibrationEffect)
             } else {
-                // Deprecated method for older Android versions
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(10000)
             }
@@ -311,8 +362,7 @@ class ErisDetectionService : LifecycleService() {
     )
 
     private fun sendEmergencySMS(message: String) {
-        val emergencyContacts = listOf("8010944027","8265004346")
-
+        val emergencyContacts = EmergencyContacts
         emergencyContacts.forEach { contact ->
             try {
                 val smsManager = SmsManager.getDefault()

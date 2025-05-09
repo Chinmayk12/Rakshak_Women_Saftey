@@ -1,11 +1,13 @@
 package com.kalpesh.women_safety
 
+import android.text.Html
+import android.text.method.LinkMovementMethod
+import android.text.util.Linkify
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.kalpesh.women_safety.databinding.ItemMessageBotBinding
 import com.kalpesh.women_safety.databinding.ItemMessageUserBinding
-
 
 class ChatAdapter(private val messages: List<ChatMessage>) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -47,17 +49,38 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
 
     override fun getItemCount(): Int = messages.size
 
+    // Helper function to convert markdown-like Gemini output to HTML
+    private fun markdownToHtml(text: String): String {
+        // Bold: **text** or __text__
+        var html = text.replace(Regex("\\*\\*(.*?)\\*\\*|__(.*?)__")) {
+            "<b>${it.groupValues[1].ifEmpty { it.groupValues[2] }}</b>"
+        }
+        // Italic: *text* or _text_
+        html = html.replace(Regex("\\*(.*?)\\*|_(.*?)_")) {
+            "<i>${it.groupValues[1].ifEmpty { it.groupValues[2] }}</i>"
+        }
+        // New lines to <br>
+        html = html.replace("\n", "<br>")
+        return html
+    }
+
     inner class UserMessageViewHolder(private val binding: ItemMessageUserBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(message: ChatMessage) {
-            binding.messageText.text = message.text
+            val htmlText = markdownToHtml(message.text)
+            binding.messageText.text = Html.fromHtml(htmlText, Html.FROM_HTML_MODE_LEGACY)
+            binding.messageText.autoLinkMask = Linkify.WEB_URLS
+            binding.messageText.movementMethod = LinkMovementMethod.getInstance()
         }
     }
 
     inner class BotMessageViewHolder(private val binding: ItemMessageBotBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(message: ChatMessage) {
-            binding.messageText.text = message.text
+            val htmlText = markdownToHtml(message.text)
+            binding.messageText.text = Html.fromHtml(htmlText, Html.FROM_HTML_MODE_LEGACY)
+            binding.messageText.autoLinkMask = Linkify.WEB_URLS
+            binding.messageText.movementMethod = LinkMovementMethod.getInstance()
         }
     }
 }

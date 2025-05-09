@@ -1,20 +1,21 @@
 package com.kalpesh.women_safety
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.firebase.auth.FirebaseAuth
 import com.kalpesh.women_safety.databinding.ActivityChatbotBinding
 import kotlinx.coroutines.CoroutineScope
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ChatbotActivity : AppCompatActivity() {
-
+    private lateinit var logoutButton: ImageView
     private lateinit var binding: ActivityChatbotBinding
     private lateinit var currentLocationOnMap: ImageView
     private lateinit var chatAdapter: ChatAdapter
@@ -26,17 +27,39 @@ class ChatbotActivity : AppCompatActivity() {
         binding = ActivityChatbotBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        logoutButton = findViewById(R.id.logoutBtn)
         currentLocationOnMap = findViewById(R.id.location_icon)
 
-        currentLocationOnMap.setOnClickListener{
+        currentLocationOnMap.setOnClickListener {
             val intent = Intent(this, CurrentLocationMap::class.java)
             startActivity(intent)
+        }
+
+        logoutButton.setOnClickListener {
+
+            AlertDialog.Builder(this)
+                .setTitle("Sign Out")
+                .setMessage("Are you sure you want to sign out?")
+                .setPositiveButton("Yes") { dialog, _ ->
+                    FirebaseAuth.getInstance().signOut()
+                    // Optional: Clear activity stack and go to login screen
+                    val intent = Intent(this, Login::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                }
+                .setNegativeButton("No") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .show()
         }
         // Initialize Gemini
         generativeModel = GenerativeModel(
             modelName = "gemini-2.0-flash",
             apiKey = "AIzaSyCVkZ5VnlFRmFE47UzXyEXBitZ10KBKWeY" // Replace with your actual API key
         )
+
+
 
         setupChatRecyclerView()
         setupClickListeners()
@@ -95,4 +118,3 @@ class ChatbotActivity : AppCompatActivity() {
         }
     }
 }
-
