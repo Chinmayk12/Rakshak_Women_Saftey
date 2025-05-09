@@ -26,7 +26,7 @@ class ChatbotActivity : AppCompatActivity() {
         // Initialize Gemini
         generativeModel = GenerativeModel(
             modelName = "gemini-2.0-flash",
-            apiKey = "AIzaSyDQGLPSil52AW0nT0p-NNUVBhIA6aOPmpY" // Replace with your actual API key
+            apiKey = "AIzaSyCVkZ5VnlFRmFE47UzXyEXBitZ10KBKWeY" // Replace with your actual API key
         )
 
         setupChatRecyclerView()

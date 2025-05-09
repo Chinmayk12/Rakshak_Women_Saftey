@@ -116,7 +116,7 @@
                                android:layout_height="wrap_content"
                                android:layout_marginTop="8dp"
                                android:gravity="center"
-                               android:text="Emergency Contacts"
+                               android:text="Emergency Sharing"
                                android:textColor="@color/app_default"
                                android:textSize="14sp"
                                android:textStyle="bold" />
@@ -180,7 +180,7 @@
                            <ImageButton
                                android:id="@+id/callpolicebtn"
                                android:layout_width="50dp"
-                               android:layout_height="50dp"
+                               android:layout_height="49dp"
                                android:layout_gravity="center"
                                android:background="@drawable/callpng"
                                android:contentDescription="Dial Police" />
@@ -190,7 +190,7 @@
                                android:layout_height="wrap_content"
                                android:layout_marginTop="8dp"
                                android:gravity="center"
-                               android:text="Call Police"
+                               android:text="Emergency Contants"
                                android:textColor="@color/app_default"
                                android:textSize="14sp"
                                android:textStyle="bold" />
@@ -213,7 +213,7 @@
 
                    <!-- Text Label on the Left -->
                    <TextView
-                       android:id="@+id/buttonText"
+                       android:id="@+id/personalInformationText"
                        android:layout_width="0dp"
                        android:layout_height="wrap_content"
                        android:layout_weight="1"

@@ -3,6 +3,7 @@ package com.kalpesh.women_safety
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -14,6 +15,8 @@ import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -30,7 +33,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnManualSOS: ImageButton
     private lateinit var btnToggleVoiceSOS: Button
     private lateinit var btnpolicecall: ImageButton
+    private lateinit var currentLocationOnMap: ImageView
+    private lateinit var emergencyButton: ImageButton
     private lateinit var btnprofile: ImageButton
+    private lateinit var personalInformationText: TextView
     private lateinit var  btnnearbyhospital : ImageButton
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var speechRecognizer: SpeechRecognizer
@@ -50,7 +56,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         btnprofile = findViewById(R.id.personalinfobtn)
         btnpolicecall = findViewById(R.id.callpolicebtn)
+        emergencyButton = findViewById(R.id.emergencybtn)
+        personalInformationText = findViewById(R.id.personalInformationText)
         btnManualSOS = findViewById(R.id.btnManualSOS)
+        currentLocationOnMap = findViewById(R.id.location_icon)
         btnToggleVoiceSOS = findViewById(R.id.toggleVoiceSOS)
         btnnearbyhospital = findViewById(R.id.nearbyhospitalbtn)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -70,10 +79,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnpolicecall.setOnClickListener {
-            val callIntent = Intent(Intent.ACTION_DIAL).apply {
-                data = Uri.parse("tel:$policePhoneNumber")
+            val intent = Intent()
+            intent.setClassName("com.android.phone", "com.android.phone.MiuiKrEmergencyListActivity")
+            try {
+                startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, "Emergency List activity not found.", Toast.LENGTH_LONG).show()
             }
-            startActivity(callIntent)
+        }
+
+        currentLocationOnMap.setOnClickListener{
+            val intent = Intent(this, CurrentLocationMap::class.java)
+            startActivity(intent)
         }
 
         btnToggleVoiceSOS.setOnClickListener {
@@ -81,6 +98,33 @@ class MainActivity : AppCompatActivity() {
                 toggleVoiceSOS()
             } else {
                 Toast.makeText(this, "Please grant all permissions to use this feature.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        personalInformationText.setOnClickListener{
+            val intent = Intent(this, profileActivity::class.java)
+            startActivity(intent)
+        }
+
+        emergencyButton.setOnClickListener{
+            try {
+                // Create an explicit intent to open the EmergencyDialerActivity
+                val intent = Intent()
+                //intent.setClassName("com.google.android.apps.safetyhub", "com.google.android.apps.safetyhub.emergencydialer.ui.EmergencyDialerActivity");
+                intent.setClassName(
+                    "com.google.android.apps.safetyhub",
+                    "com.google.android.apps.safetyhub.LauncherActivity"
+                )
+
+                startActivity(intent)
+            } catch (e: java.lang.Exception) {
+                e.printStackTrace()
+                // Handle the case where the activity is not found or the app is not installed
+                val playStoreIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.apps.safetyhub")
+                )
+                startActivity(playStoreIntent)
             }
         }
 
@@ -99,9 +143,6 @@ class MainActivity : AppCompatActivity() {
         bottomNavigationView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
-                    val intent = Intent(this@MainActivity, MainActivity::class.java)
-                    startActivity(intent)
-
                     true
                 }
                 R.id.nav_chat -> {
@@ -125,7 +166,7 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_profilee -> {
-                    val intent = Intent(this, ErisActivity::class.java) // Replace with your ProfileActivity
+                    val intent = Intent(this, ErisAndTapDetectionTestingActivity::class.java) // Replace with your ProfileActivity
                     startActivity(intent)
                     true
                 }
@@ -258,7 +299,7 @@ class MainActivity : AppCompatActivity() {
 
 
         // List of emergency contacts (replace with real numbers)
-        val emergencyContacts = listOf("8010944027", "8265004346")
+        val emergencyContacts = listOf("8010944027", "")
 
         for (contact in emergencyContacts) {
             sendSMS(contact, sosMessage)

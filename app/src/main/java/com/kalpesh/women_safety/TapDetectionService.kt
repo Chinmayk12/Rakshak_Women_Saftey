@@ -19,7 +19,6 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import kotlin.math.abs
-import kotlin.math.sqrt
 
 class TapDetectionService : LifecycleService(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
@@ -37,7 +36,7 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
     private lateinit var locationManager: EmergencyLocationManager
 
     // For tap detection - REDUCED THRESHOLD to match ErisActivity
-    private val tapThreshold = 4.0f // Matching ErisActivity's threshold
+    private val tapThreshold = 7.5f // Matching ErisActivity's threshold
     private val cooldownPeriod = 500L // Same as in ErisActivity
 
     companion object {
@@ -159,7 +158,7 @@ class TapDetectionService : LifecycleService(), SensorEventListener {
     private fun createMonitoringNotification(
         contentText: String = "Monitoring for tap emergency pattern"
     ): Notification {
-        val notificationIntent = Intent(this, ErisActivity::class.java)
+        val notificationIntent = Intent(this, ErisAndTapDetectionTestingActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
         )

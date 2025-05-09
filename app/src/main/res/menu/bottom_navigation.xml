@@ -6,14 +6,14 @@
         android:title="Home" />
     <item
         android:id="@+id/nav_chat"
-        android:icon="@drawable/messenger"
-        android:title="Chat" />
+        android:icon="@drawable/blog_icon"
+        android:title="Blog" />
     <item
         android:id="@+id/nav_chatbot"
         android:icon="@drawable/chatbot"
         android:title="Chatbot" />
     <item
         android:id="@+id/nav_profilee"
-        android:icon="@drawable/sosimg"
-        android:title="Profile"/>
+        android:icon="@drawable/baseline_add_alert_24"
+        android:title="Alert"/>
 </menu>

@@ -144,7 +144,7 @@ class ErisDetectionService : LifecycleService() {
     private fun createMonitoringNotification(
         contentText: String = "Monitoring for emergency signals"
     ): Notification {
-        val notificationIntent = Intent(this, ErisActivity::class.java)
+        val notificationIntent = Intent(this, ErisAndTapDetectionTestingActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
         )

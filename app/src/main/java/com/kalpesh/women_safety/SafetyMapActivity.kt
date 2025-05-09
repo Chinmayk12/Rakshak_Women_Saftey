@@ -18,9 +18,6 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
-import com.mappls.sdk.geojson.Feature
-import com.mappls.sdk.geojson.FeatureCollection
-import com.mappls.sdk.geojson.Point
 import com.mappls.sdk.maps.annotations.IconFactory
 import com.mappls.sdk.maps.annotations.Marker
 import com.mappls.sdk.maps.annotations.MarkerOptions
@@ -30,14 +27,6 @@ import com.mappls.sdk.maps.MapplsMap
 import com.mappls.sdk.maps.OnMapReadyCallback as MapplsOnMapReadyCallback
 import com.mappls.sdk.maps.camera.CameraUpdateFactory
 import com.mappls.sdk.maps.geometry.LatLng
-import com.mappls.sdk.maps.geometry.LatLngBounds
-import com.mappls.sdk.maps.style.expressions.Expression.exponential
-import com.mappls.sdk.maps.style.expressions.Expression.interpolate
-import com.mappls.sdk.maps.style.expressions.Expression.stop
-import com.mappls.sdk.maps.style.expressions.Expression.zoom
-import com.mappls.sdk.maps.style.layers.PropertyFactory
-import com.mappls.sdk.maps.style.layers.SymbolLayer
-import com.mappls.sdk.maps.style.sources.GeoJsonSource
 import com.mappls.sdk.maps.utils.BitmapUtils
 import com.mappls.sdk.services.account.MapplsAccountManager
 import com.mappls.sdk.services.api.OnResponseCallback

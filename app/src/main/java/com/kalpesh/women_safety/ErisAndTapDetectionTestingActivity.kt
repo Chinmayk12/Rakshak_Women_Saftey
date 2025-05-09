@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
-class ErisActivity : AppCompatActivity() , SensorEventListener {
+class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventListener {
     private lateinit var viewFinder: PreviewView
     private lateinit var gestureStatus: TextView
     private lateinit var calibrateButton: Button
@@ -117,7 +117,7 @@ class ErisActivity : AppCompatActivity() , SensorEventListener {
         // Calculate acceleration magnitude
         val acceleration = Math.sqrt(x * x + y * y + z * z.toDouble()) - SensorManager.GRAVITY_EARTH
 
-        if (acceleration > 4.0f) { // Threshold for tap detection
+        if (acceleration > 7.5f) { // Threshold for tap detection
             handlePhoneTap()
         }
     }

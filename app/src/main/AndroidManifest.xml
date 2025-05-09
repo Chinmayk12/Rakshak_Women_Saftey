@@ -3,35 +3,36 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Permissions -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED">1
+    </uses-permission><uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" /> <!-- Add these two permissions for foreground service camera -->
+    <uses-permission android:name="android.permission.CAMERA" /> <!-- Add these two permissions for foreground service camera -->
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_CAMERA"
         tools:ignore="ForegroundServicePermission" />
@@ -65,6 +66,9 @@
         android:theme="@style/Theme.Women_safety"
         tools:targetApi="31">
         <activity
+            android:name=".CurrentLocationMap"
+            android:exported="false" />
+        <activity
             android:name=".SafetyMapActivity"
             android:exported="false" />
         <activity
@@ -76,7 +80,6 @@
             android:exported="false"
             android:foregroundServiceType="camera"
             tools:ignore="ForegroundServicePermission" />
-
         <service
             android:name=".TapDetectionService"
             android:enabled="true"
@@ -84,9 +87,8 @@
             android:foregroundServiceType="location"
             tools:ignore="ForegroundServicePermission" />
 
-
         <activity
-            android:name=".ErisActivity"
+            android:name=".ErisAndTapDetectionTestingActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
@@ -119,12 +121,6 @@
             android:name=".BlogActivity"
             android:exported="false" />
         <activity
-            android:name=".NearbyDoctorsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".NearbyDoctors"
-            android:exported="false" />
-        <activity
             android:name=".Login"
             android:exported="false" />
         <activity
@@ -136,7 +132,6 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" />
-
     </application>
 
 </manifest>

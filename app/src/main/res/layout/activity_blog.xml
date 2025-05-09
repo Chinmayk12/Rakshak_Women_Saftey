@@ -55,9 +55,8 @@
             android:src="@drawable/baseline_notifications_none_24"
             android:contentDescription="Notification Icon" />
     </LinearLayout>
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewBlogs"
+    <WebView
+        android:id="@+id/webview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp" />
+        android:layout_height="match_parent" />
 </LinearLayout>
