@@ -2,6 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Permissions -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -60,11 +71,20 @@
             android:name=".ForgotPassword"
             android:exported="false" /> <!-- SOS Detection Service with updated foregroundServiceType -->
         <service
-            android:name=".SOSDetectionService"
+            android:name=".ErisDetectionService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="camera"
-            tools:ignore="ForegroundServicePermission" /> <!-- Activities -->
+            tools:ignore="ForegroundServicePermission" />
+
+        <service
+            android:name=".TapDetectionService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            tools:ignore="ForegroundServicePermission" />
+
+
         <activity
             android:name=".ErisActivity"
             android:exported="false"

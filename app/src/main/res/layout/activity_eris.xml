@@ -26,6 +26,20 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <TextView
+        android:id="@+id/tapStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:background="#80000000"
+        android:padding="8dp"
+        android:text="Tap count: 0"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/gestureStatus" />
+
     <LinearLayout
         android:id="@+id/controlsLayout"
         android:layout_width="match_parent"
@@ -41,6 +55,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Calibrate Blink Pattern"
+            android:textColor="@color/white"/>
+
+        <Button
+            android:background="@drawable/rounded_btn"
+            android:id="@+id/tapPatternButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Tap Pattern"
             android:textColor="@color/white"/>
 
         <Button

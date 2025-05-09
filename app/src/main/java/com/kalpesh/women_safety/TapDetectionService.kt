@@ -1,52 +1,49 @@
 package com.kalpesh.women_safety
 
-import android.Manifest
 import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
 import android.os.*
 import android.telephony.SmsManager
 import android.util.Log
 import android.widget.Toast
-import androidx.camera.core.*
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.math.abs
-import android.os.VibrationEffect
-import android.os.Build
-import com.google.firebase.FirebaseApp
+import kotlin.math.sqrt
 
-class SOSDetectionService : LifecycleService() {
-    private lateinit var cameraExecutor: ExecutorService
-    private var calibrationPattern: List<Long> = listOf()
-    private var currentBlinkPattern = mutableListOf<Long>()
-    private var lastBlinkTime: Long = 0
+class TapDetectionService : LifecycleService(), SensorEventListener {
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+
+    // Tap pattern detection variables
+    private var tapPattern = mutableListOf<Long>()
+    private var lastTapTime: Long = 0
+    private var calibrationTapPattern = mutableListOf<Long>()
+
     private lateinit var wakeLock: PowerManager.WakeLock
     private lateinit var vibrator: Vibrator
-    private var camera: Camera? = null
-    private var imageAnalysis: ImageAnalysis? = null
-    private var processCameraProvider: ProcessCameraProvider? = null
     private val database = FirebaseDatabase.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private lateinit var locationManager: EmergencyLocationManager
 
+    // For tap detection - REDUCED THRESHOLD to match ErisActivity
+    private val tapThreshold = 4.0f // Matching ErisActivity's threshold
+    private val cooldownPeriod = 500L // Same as in ErisActivity
+
     companion object {
-        private const val CHANNEL_ID = "SOS_Service_Channel"
-        private const val NOTIFICATION_ID = 1
-        private const val TAG = "SOSDetectionService"
+        private const val CHANNEL_ID = "TapSOS_Service_Channel"
+        private const val NOTIFICATION_ID = 2
+        private const val TAG = "TapDetectionService"
         var isServiceRunning = false
     }
 
@@ -58,7 +55,7 @@ class SOSDetectionService : LifecycleService() {
 
     private fun initializeServiceComponents() {
         createNotificationChannel()
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        setupSensors()
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         setupWakeLock()
 
@@ -66,11 +63,20 @@ class SOSDetectionService : LifecycleService() {
         locationManager = EmergencyLocationManager.getInstance(this)
     }
 
+    private fun setupSensors() {
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        if (accelerometer == null) {
+            Log.e(TAG, "No accelerometer found on device")
+        }
+    }
+
     private fun setupWakeLock() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "SOSDetection:WakeLock"
+            "TapDetection:WakeLock"
         ).apply {
             acquire(10 * 60 * 1000L) // 10 minutes wake lock
         }
@@ -81,10 +87,12 @@ class SOSDetectionService : LifecycleService() {
 
         when (intent?.action) {
             "START_DETECTION" -> {
-                intent.getLongArrayExtra("calibrationPattern")?.let { pattern ->
-                    calibrationPattern = pattern.toList()
-                    startDetection()
+                // Get the calibration pattern if provided
+                intent.getLongArrayExtra("calibrationPattern")?.let {
+                    calibrationTapPattern = it.toMutableList()
+                    Log.d(TAG, "Received calibration pattern: $calibrationTapPattern")
                 }
+                startDetection()
             }
             "STOP_DETECTION" -> stopDetection()
         }
@@ -98,8 +106,16 @@ class SOSDetectionService : LifecycleService() {
         // Start location updates immediately to ensure we have fresh location data
         locationManager.startLocationUpdates()
 
-        startCamera()
-        isServiceRunning = true
+        // Register sensor listener
+        accelerometer?.let {
+            sensorManager.registerListener(
+                this,
+                it,
+                SensorManager.SENSOR_DELAY_NORMAL
+            )
+            isServiceRunning = true
+            Log.d(TAG, "Tap detection started with threshold: $tapThreshold")
+        }
     }
 
     private fun stopDetection() {
@@ -109,15 +125,12 @@ class SOSDetectionService : LifecycleService() {
 
     private fun releaseResources() {
         try {
-            imageAnalysis?.clearAnalyzer()
-            camera?.cameraControl?.enableTorch(false)
-            processCameraProvider?.unbindAll()
+            sensorManager.unregisterListener(this)
 
             // Stop location updates to save battery
             locationManager.stopLocationUpdates()
 
             if (wakeLock.isHeld) wakeLock.release()
-            cameraExecutor.shutdown()
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing resources", e)
         } finally {
@@ -129,10 +142,10 @@ class SOSDetectionService : LifecycleService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "SOS Detection Service",
+                "Tap Detection Service",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Running SOS detection in background"
+                description = "Running tap detection in background"
                 enableLights(true)
                 lightColor = Color.RED
             }
@@ -144,7 +157,7 @@ class SOSDetectionService : LifecycleService() {
     }
 
     private fun createMonitoringNotification(
-        contentText: String = "Monitoring for emergency signals"
+        contentText: String = "Monitoring for tap emergency pattern"
     ): Notification {
         val notificationIntent = Intent(this, ErisActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
@@ -152,105 +165,92 @@ class SOSDetectionService : LifecycleService() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SOS Detection Active")
-            .setContentText("Monitoring for emergency blinks")
+            .setContentTitle("Tap Detection Active")
+            .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notifications)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
-    private fun startCamera() {
-        ProcessCameraProvider.getInstance(this).addListener({
-            try {
-                processCameraProvider = ProcessCameraProvider.getInstance(this).get()
-
-                imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { it.setAnalyzer(cameraExecutor, createFaceAnalyzer()) }
-
-                val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
-                processCameraProvider?.unbindAll()
-                camera = processCameraProvider?.bindToLifecycle(
-                    this, cameraSelector, imageAnalysis
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Camera initialization failed", e)
-            }
-        }, ContextCompat.getMainExecutor(this))
-    }
-
-    @androidx.annotation.OptIn(ExperimentalGetImage::class)
-    private fun createFaceAnalyzer(): ImageAnalysis.Analyzer {
-        val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .build()
-
-        val detector = FaceDetection.getClient(options)
-
-        return ImageAnalysis.Analyzer { imageProxy ->
-            val mediaImage = imageProxy.image
-            if (mediaImage != null) {
-                val image = InputImage.fromMediaImage(
-                    mediaImage,
-                    imageProxy.imageInfo.rotationDegrees
-                )
-
-                detector.process(image)
-                    .addOnSuccessListener { faces ->
-                        if (faces.isNotEmpty()) {
-                            val face = faces[0]
-                            val leftEyeOpenProb = face.leftEyeOpenProbability ?: 0f
-                            val rightEyeOpenProb = face.rightEyeOpenProbability ?: 0f
-
-                            if (leftEyeOpenProb < 0.1 && rightEyeOpenProb < 0.1) {
-                                handleBlink()
-                            }
-                        }
-                    }
-                    .addOnCompleteListener { imageProxy.close() }
-            } else {
-                imageProxy.close()
-            }
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            detectTap(event)
         }
     }
 
-    private fun handleBlink() {
+    private fun detectTap(event: SensorEvent) {
+        val x = event.values[0]
+        val y = event.values[1]
+        val z = event.values[2]
+
+        // Calculate acceleration magnitude
+        val acceleration = Math.sqrt(x * x + y * y + z * z.toDouble()) - SensorManager.GRAVITY_EARTH
+
         val currentTime = System.currentTimeMillis()
 
-        if (currentTime - lastBlinkTime > 500) {
-            currentBlinkPattern.add(currentTime - lastBlinkTime)
-
-            if (currentBlinkPattern.size > calibrationPattern.size) {
-                currentBlinkPattern.removeAt(0)
-            }
-
-            if (currentBlinkPattern.size == calibrationPattern.size && patternsMatch()) {
-                triggerSOS()
-                currentBlinkPattern.clear()
-            }
-
-            lastBlinkTime = currentTime
+        // Match the logic from ErisActivity for consistency
+        if (acceleration > tapThreshold && (currentTime - lastTapTime > cooldownPeriod)) {
+            Log.d(TAG, "Tap detected with acceleration: $acceleration")
+            handlePhoneTap()
         }
     }
 
-    private fun patternsMatch(): Boolean {
-        if (currentBlinkPattern.size != calibrationPattern.size) return false
+    private fun handlePhoneTap() {
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastTap = currentTime - lastTapTime
 
-        val match = currentBlinkPattern.zip(calibrationPattern).all { (current, calibration) ->
-            abs(current - calibration) <= calibration * 0.5
-        }
+        // Process tap following the same logic as in ErisActivity
+        if (timeSinceLastTap > 500) { // Prevent multiple detections for same tap
+            Log.d(TAG, "Processing tap with interval: $timeSinceLastTap")
 
-        if (match) {
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(applicationContext, "SOS Triggered!", Toast.LENGTH_SHORT).show()
+            if (tapPattern.isEmpty()) {
+                // First tap in sequence
+                tapPattern.add(0L) // First tap has no interval
+            } else {
+                tapPattern.add(timeSinceLastTap)
+            }
+
+            // Keep pattern size consistent with calibration pattern
+            if (tapPattern.size > 5) { // 5 taps = 4 intervals + initial 0
+                tapPattern.removeAt(0)
+            }
+
+            // Debug log the current pattern
+            Log.d(TAG, "Current tap pattern: $tapPattern")
+            if (!calibrationTapPattern.isEmpty()) {
+                Log.d(TAG, "Calibration tap pattern: $calibrationTapPattern")
+            }
+
+            // Check if we have enough taps and if the pattern matches
+            if (tapPattern.size >= 5 && tapPatternsMatch()) {
+                Log.d(TAG, "TAP PATTERN MATCHED! Triggering SOS!")
+
+                // Show a toast notification
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(applicationContext, "SOS Triggered by tap pattern!", Toast.LENGTH_SHORT).show()
+                }
+
+                // Trigger SOS
+                triggerSOS()
+
+                // Reset the pattern
+                tapPattern.clear()
             }
         }
+        lastTapTime = currentTime
+    }
 
-        return match
+    private fun tapPatternsMatch(): Boolean {
+        // Skip the first element (0) in both patterns
+        val currentIntervals = tapPattern.drop(1)
+        val calibrationIntervals = calibrationTapPattern.drop(1)
+
+        if (currentIntervals.size < calibrationIntervals.size) return false
+
+        return currentIntervals.zip(calibrationIntervals).all { (current, calibration) ->
+            abs(current - calibration) <= calibration * 0.5 // Allow 50% tolerance
+        }
     }
 
     private fun triggerSOS() {
@@ -307,13 +307,14 @@ class SOSDetectionService : LifecycleService() {
         "longitude" to location.longitude,
         "timestamp" to System.currentTimeMillis(),
         "userId" to userId,
+        "triggerMethod" to "tap_pattern",
         "locationProvider" to (location.provider ?: "unknown"),
         "locationAccuracy" to (if (location.hasAccuracy()) location.accuracy else -1f),
         "locationTime" to location.time
     )
 
     private fun sendEmergencySMS(message: String) {
-        val emergencyContacts = listOf("8010944027","8265004346")
+        val emergencyContacts = listOf("8010944027","")
 
         emergencyContacts.forEach { contact ->
             try {
@@ -354,7 +355,11 @@ class SOSDetectionService : LifecycleService() {
 
         val notificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(2, notification)
+        notificationManager.notify(3, notification)
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Not needed for this implementation
     }
 
     override fun onDestroy() {

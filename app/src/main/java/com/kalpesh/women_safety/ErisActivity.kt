@@ -1,8 +1,13 @@
 package com.kalpesh.women_safety
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -21,15 +26,26 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.abs
 
-class ErisActivity : AppCompatActivity() {
+class ErisActivity : AppCompatActivity() , SensorEventListener {
     private lateinit var viewFinder: PreviewView
     private lateinit var gestureStatus: TextView
     private lateinit var calibrateButton: Button
+    private lateinit var tapPatternButton: Button
     private lateinit var toggleDetectionButton: Button
     private lateinit var instructionsText: TextView
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var tapStatus: TextView
 
+    private var isTestingTaps = false
+    private var tapCount = 0
+    private var lastTapTime: Long = 0
+    private var tapPattern = mutableListOf<Long>()
+    private var calibrationTapPattern = mutableListOf<Long>()
+    private lateinit var sensorManager: SensorManager
+    private lateinit var accelerometer: Sensor
+    private var isTestingMode = true // To prevent SMS during testing
     private var isCalibrating = false
     private var isDetecting = false
     private var calibrationBlinkPattern = mutableListOf<Long>()
@@ -44,6 +60,7 @@ class ErisActivity : AppCompatActivity() {
         initializeViews()
         setupButtons()
         checkPermissions()
+        setupSensors()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
@@ -54,6 +71,8 @@ class ErisActivity : AppCompatActivity() {
         calibrateButton = findViewById(R.id.calibrateButton)
         toggleDetectionButton = findViewById(R.id.toggleDetectionButton)
         instructionsText = findViewById(R.id.instructionsText)
+        tapPatternButton = findViewById(R.id.tapPatternButton)
+        tapStatus = findViewById(R.id.tapStatus)
     }
 
     private fun setupButtons() {
@@ -61,9 +80,104 @@ class ErisActivity : AppCompatActivity() {
             startCalibration()
         }
 
+        tapPatternButton.setOnClickListener {
+            if (isDetecting) {
+                Toast.makeText(this, "Stop detection first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            startTapCalibration()
+        }
+
         toggleDetectionButton.setOnClickListener {
+            if (calibrationBlinkPattern.isEmpty() || calibrationTapPattern.isEmpty()) {
+                Toast.makeText(this, "Please calibrate both patterns first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            isTestingMode = false
             toggleDetection()
         }
+    }
+
+    private fun startTapCalibration() {
+        isTestingTaps = true
+        tapCount = 0
+        tapPattern.clear()
+        gestureStatus.text = "Calibrating Taps: Tap phone back 5 times"
+        tapStatus.text = "Tap count: 0"
+        instructionsText.text = "Tap the back of your phone 5 times to set pattern"
+    }
+
+    override fun onSensorChanged(event: SensorEvent) {
+        if (!isTestingTaps && !isDetecting) return
+
+        val x = event.values[0]
+        val y = event.values[1]
+        val z = event.values[2]
+
+        // Calculate acceleration magnitude
+        val acceleration = Math.sqrt(x * x + y * y + z * z.toDouble()) - SensorManager.GRAVITY_EARTH
+
+        if (acceleration > 4.0f) { // Threshold for tap detection
+            handlePhoneTap()
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun handlePhoneTap() {
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastTap = currentTime - lastTapTime
+
+        if (timeSinceLastTap > 500) { // Prevent multiple detections for same tap
+            if (isTestingTaps) {
+                tapCount++
+                tapStatus.text = "Tap count: $tapCount"
+
+                if (tapCount > 1) {
+                    tapPattern.add(timeSinceLastTap)
+                }
+
+                if (tapCount >= 5) {
+                    calibrationTapPattern = tapPattern.toMutableList()
+                    isTestingTaps = false
+                    gestureStatus.text = "Tap Calibration Complete!"
+                    tapStatus.text = "Tap pattern stored"
+                    instructionsText.text = "Both patterns set. Start detection when ready."
+                    Toast.makeText(this, "Tap calibration complete!", Toast.LENGTH_SHORT).show()
+                }
+            } else if (isDetecting) {
+                // During detection mode
+                tapPattern.add(timeSinceLastTap)
+
+                if (tapPattern.size > calibrationTapPattern.size) {
+                    tapPattern.removeAt(0)
+                }
+
+                if (tapPattern.size == calibrationTapPattern.size && tapPatternsMatch()) {
+                    if (!isTestingMode) {
+                        triggerSOS("TAP")
+                    }
+                    tapPattern.clear()
+                }
+            }
+        }
+        lastTapTime = currentTime
+    }
+
+    private fun tapPatternsMatch(): Boolean {
+        if (tapPattern.size != calibrationTapPattern.size) return false
+
+        return tapPattern.zip(calibrationTapPattern).all { (current, calibration) ->
+            abs(current - calibration) <= calibration * 0.5
+        }
+    }
+    private fun triggerSOS(triggerType: String) {
+        // This will only be called when isTestingMode is false
+        val serviceIntent = Intent(this, ErisDetectionService::class.java).apply {
+            action = "TRIGGER_SOS"
+            putExtra("triggerType", triggerType)
+        }
+        startService(serviceIntent)
     }
 
     private fun checkPermissions() {
@@ -89,6 +203,11 @@ class ErisActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupSensors() {
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)!!
+    }
+
     private fun startCalibration() {
         isCalibrating = true
         isDetecting = false
@@ -99,29 +218,45 @@ class ErisActivity : AppCompatActivity() {
         toggleDetectionButton.text = "Start Detection"
     }
 
-
     private fun startBackgroundDetection() {
-        val serviceIntent = Intent(this, SOSDetectionService::class.java).apply {
+        // Start the blink detection service
+        val blinkServiceIntent = Intent(this, ErisDetectionService::class.java).apply {
             action = "START_DETECTION"
             putExtra("calibrationPattern", calibrationBlinkPattern.toLongArray())
         }
 
+        // Start the tap detection service
+        val tapServiceIntent = Intent(this, TapDetectionService::class.java).apply {
+            action = "START_DETECTION"
+        }
+
         requestBatteryOptimizationExemption()
 
+        // Start both services
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
+            startForegroundService(blinkServiceIntent)
+            startForegroundService(tapServiceIntent)
         } else {
-            startService(serviceIntent)
+            startService(blinkServiceIntent)
+            startService(tapServiceIntent)
         }
 
         Toast.makeText(this, "Background detection started", Toast.LENGTH_SHORT).show()
     }
 
     private fun stopBackgroundDetection() {
-        val serviceIntent = Intent(this, SOSDetectionService::class.java).apply {
+        // Stop blink detection service
+        val blinkServiceIntent = Intent(this, ErisDetectionService::class.java).apply {
             action = "STOP_DETECTION"
         }
-        stopService(serviceIntent)
+        stopService(blinkServiceIntent)
+
+        // Stop tap detection service
+        val tapServiceIntent = Intent(this, TapDetectionService::class.java).apply {
+            action = "STOP_DETECTION"
+        }
+        stopService(tapServiceIntent)
+
         Toast.makeText(this, "Detection stopped", Toast.LENGTH_SHORT).show()
     }
 
@@ -285,10 +420,20 @@ class ErisActivity : AppCompatActivity() {
             }
         }
     }
+    override fun onResume() {
+        super.onResume()
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(this)
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        sensorManager.unregisterListener(this)
     }
 
     companion object {
