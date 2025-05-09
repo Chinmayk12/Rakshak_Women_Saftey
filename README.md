@@ -79,8 +79,4 @@ With rising concerns around women's safety, Rakshak offers a multi-layered emerg
 - Firebase Project with FCM enabled
 - MongoDB backend hosted or local instance
 
-### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/JayeshPatil18/DevClash-Rakshak
