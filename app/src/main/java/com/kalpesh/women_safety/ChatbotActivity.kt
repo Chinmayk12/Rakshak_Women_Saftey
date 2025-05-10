@@ -56,7 +56,7 @@ class ChatbotActivity : AppCompatActivity() {
         // Initialize Gemini
         generativeModel = GenerativeModel(
             modelName = "gemini-2.0-flash",
-            apiKey = "AIzaSyCVkZ5VnlFRmFE47UzXyEXBitZ10KBKWeY" // Replace with your actual API key
+            apiKey = "AIzaSyCz15tYlHjYGVWZZCpV_1zWglU3nq784hM" // Replace with your actual API key
         )
 
 
