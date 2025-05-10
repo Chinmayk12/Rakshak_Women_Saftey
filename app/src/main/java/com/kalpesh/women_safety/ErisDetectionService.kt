@@ -37,7 +37,7 @@ class ErisDetectionService : LifecycleService() {
     private var EmergencyContacts: List<String> = emptyList()
     private var lastBlinkTime: Long = 0
     private var calibrationStartTime: Long = 0
-    private val MAX_BLINK_PATTERN_DURATION = 3000L // 3 seconds for rapid blinks
+    private val MAX_BLINK_PATTERN_DURATION = 3500L // 3 seconds for rapid blinks
 
     private lateinit var wakeLock: PowerManager.WakeLock
     private lateinit var vibrator: Vibrator

@@ -58,7 +58,7 @@ class ErisAndTapDetectionTestingActivity : AppCompatActivity() , SensorEventList
     private var blinkCount = 0
     private var calibrationStartTime: Long = 0
 
-    private val MAX_CALIBRATION_BLINK_DURATION = 3000L // 3 seconds for 5 blinks
+    private val MAX_CALIBRATION_BLINK_DURATION = 3500L // 3 seconds for 5 blinks
     private val TAP_THRESHOLD = 5.5f // Accelerometer Z-axis tap threshold (tune as needed)
     private val ROTATION_THRESHOLD = 2.0f // Gyroscope threshold (tune as needed)
     private val TAP_COOLDOWN = 300 // milliseconds between taps
